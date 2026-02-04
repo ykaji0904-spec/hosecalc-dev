@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gis-platform.pages.dev/sitemap.xml

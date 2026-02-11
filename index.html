@@ -180,8 +180,20 @@
         .scale-bar{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:4px}
         .scale-line{height:3px;background:white;border-radius:1px;min-width:40px}
         .scale-text{color:white;font-size:9px;font-weight:500}
-        .loading{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(15,15,15,0.95);padding:20px 30px;border-radius:12px;color:white;font-size:13px;display:none;z-index:3000}
-        .loading.show{display:block}
+        .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:none;z-index:3000;justify-content:center;align-items:center;flex-direction:column}
+        .loading-overlay.show{display:flex}
+        .loading-spinner{width:60px;height:60px;position:relative;margin-bottom:20px}
+        .loading-spinner::before{content:'';position:absolute;width:100%;height:100%;border:3px solid rgba(255,152,0,0.2);border-radius:50%;box-sizing:border-box}
+        .loading-spinner::after{content:'';position:absolute;width:100%;height:100%;border:3px solid transparent;border-top-color:#ff9800;border-radius:50%;box-sizing:border-box;animation:spin 1s linear infinite}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        .loading-content{text-align:center}
+        .loading-title{color:#ff9800;font-size:18px;font-weight:bold;margin-bottom:8px}
+        .loading-message{color:rgba(255,255,255,0.8);font-size:13px;margin-bottom:12px}
+        .loading-progress{width:200px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden}
+        .loading-progress-bar{height:100%;background:linear-gradient(90deg,#ff9800,#ffb74d);width:0%;transition:width 0.3s ease;animation:progress-pulse 1.5s ease-in-out infinite}
+        @keyframes progress-pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+        .loading-icon{font-size:48px;margin-bottom:16px;animation:float 2s ease-in-out infinite}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
         .toast{position:fixed;top:110px;left:50%;transform:translateX(-50%);background:rgba(50,50,50,0.95);padding:12px 20px;border-radius:10px;color:white;font-size:13px;z-index:3000;display:none}
         .toast.show{display:block;animation:fadeInOut 2.5s ease}
         @keyframes fadeInOut{0%,100%{opacity:0}10%,90%{opacity:1}}
@@ -210,7 +222,15 @@
         <div class="map-type-switch"><button class="map-type-btn active" id="mapBtnSatellite" onclick="setBasemap('satellite')"><span class="material-icons">satellite_alt</span><span>衛星</span></button><button class="map-type-btn" id="mapBtnStd" onclick="setBasemap('std')"><span class="material-icons">map</span><span>地図</span></button></div>
         <button class="menu-btn" onclick="openSidePanel()"><span class="material-icons">menu</span></button>
     </div>
-    <div class="loading" id="loading">読み込み中...</div>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-icon">🔥</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-content">
+            <div class="loading-title" id="loadingTitle">HoseCalc</div>
+            <div class="loading-message" id="loadingMessage">初期化中...</div>
+            <div class="loading-progress"><div class="loading-progress-bar" id="loadingProgress"></div></div>
+        </div>
+    </div>
     <div class="toast" id="toast"></div>
     <div class="coord-popup" id="coordPopup"><div class="coord-popup-header"><span class="coord-popup-title">座標</span><button class="coord-popup-close" onclick="hideCoordPopup()">×</button></div><div class="coord-popup-value" id="coordPopupValue">-</div><button class="coord-popup-btn" onclick="copyCoords()"><span class="material-icons">content_copy</span>コピー</button></div>
     <div class="marker-popup" id="markerPopup"><div class="marker-popup-header"><span class="marker-popup-name" id="markerPopupName">-</span><button class="marker-popup-close" onclick="hideMarkerPopup()">×</button></div><div class="marker-popup-coord" id="markerPopupCoord">-</div><div class="marker-popup-elev" id="markerPopupElev">-</div><button class="marker-popup-btn" onclick="copyMarkerCoords()"><span class="material-icons">content_copy</span>コピー</button></div>
@@ -349,8 +369,7 @@
             const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
             const radius = 0.0675;
             trailLoadActive = true; 
-            document.getElementById('loading').textContent = '登山道を読み込み中...'; 
-            showLoading(true); 
+            showLoading(true, '登山道を読み込み中...', 30); 
             const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']; 
             const server = servers[Math.floor(Math.random() * servers.length)]; 
             try { 
@@ -358,8 +377,10 @@
                 const query = `[out:json][timeout:25];(way["highway"~"path|footway|track"](${bbox}););out body;>;out skel qt;`; 
                 const controller = new AbortController(); 
                 const timeoutId = setTimeout(() => controller.abort(), 20000); 
+                showLoading(true, 'サーバーに接続中...', 50);
                 const res = await fetch(`${server}?data=${encodeURIComponent(query)}`, { signal: controller.signal }); 
                 clearTimeout(timeoutId); 
+                showLoading(true, 'データを処理中...', 70);
                 const data = await res.json(); 
                 const nodes = new Map(); 
                 data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); }); 
@@ -367,6 +388,8 @@
                 const batchSize = 100; 
                 for (let i = 0; i < ways.length; i += batchSize) { 
                     const batch = ways.slice(i, i + batchSize); 
+                    const progress = 70 + Math.round((i / ways.length) * 25);
+                    showLoading(true, `登山道を描画中... (${i}/${ways.length})`, progress);
                     batch.forEach(way => { 
                         if (trailEntities.some(e => e.osmId === way.id)) return; 
                         const pos = way.nodes.filter(nid => nodes.has(nid)).map(nid => { const n = nodes.get(nid); return Cesium.Cartesian3.fromDegrees(n[0], n[1]); }); 
@@ -376,10 +399,12 @@
                         } 
                     }); 
                 } 
+                showLoading(true, '完了', 100);
                 if (ways.length > 0) showToast(`登山道 ${ways.length}本を読み込みました`); 
                 else showToast('この範囲に登山道データがありません');
             } catch(e) { if (e.name === 'AbortError') showToast('読み込みタイムアウト'); else showToast('登山道の読み込みに失敗'); } 
-            trailLoadActive = false; document.getElementById('loading').textContent = '読み込み中...'; showLoading(false); 
+            trailLoadActive = false; 
+            setTimeout(() => showLoading(false), 300);
         }
         
         // 修正10: サイト説明変更
@@ -392,7 +417,7 @@
             }; 
             alert(m[type] || ''); 
         }
-        async function doSearch() { const q = document.getElementById('searchInput').value.trim(); if (!q) return; showLoading(true); try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5`); const data = await res.json(); const sr = document.getElementById('searchResults'); sr.innerHTML = data.length === 0 ? '<div class="search-result-item"><span class="search-result-name">結果なし</span></div>' : data.map(r => `<div class="search-result-item" onclick="flyToSearch(${r.lon},${r.lat})"><div class="search-result-name">${r.display_name.split(',')[0]}</div><div class="search-result-address">${r.display_name}</div></div>`).join(''); sr.classList.add('show'); } catch(e) { showToast('検索エラー'); } showLoading(false); }
+        async function doSearch() { const q = document.getElementById('searchInput').value.trim(); if (!q) return; showLoading(true, '検索中...', 50); try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5`); const data = await res.json(); const sr = document.getElementById('searchResults'); sr.innerHTML = data.length === 0 ? '<div class="search-result-item"><span class="search-result-name">結果なし</span></div>' : data.map(r => `<div class="search-result-item" onclick="flyToSearch(${r.lon},${r.lat})"><div class="search-result-name">${r.display_name.split(',')[0]}</div><div class="search-result-address">${r.display_name}</div></div>`).join(''); sr.classList.add('show'); } catch(e) { showToast('検索エラー'); } showLoading(false); }
         function flyToSearch(lon, lat) { viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(lon, lat, 1500), duration: 1.5 }); document.getElementById('searchResults').classList.remove('show'); }
         document.addEventListener('click', e => { if (!e.target.closest('.search-box') && !e.target.closest('.search-results')) document.getElementById('searchResults').classList.remove('show'); });
         
@@ -408,8 +433,52 @@
                 myLocationEntity = viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(lon, lat), billboard: { image: createMyLocationIcon(), width: 24, height: 24, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } }); 
             }, () => { document.getElementById('myLocationText').textContent = '取得失敗'; }); 
         }
+        
+        // 初期化関数
+        async function initializeApp() {
+            showLoading(true, '地図を初期化中...', 10);
+            
+            // 位置情報取得を試行
+            let initialLat = 34.3853, initialLon = 132.4553; // デフォルト: 広島
+            
+            try {
+                showLoading(true, '位置情報を取得中...', 20);
+                const position = await new Promise((resolve, reject) => {
+                    if (!navigator.geolocation) reject('非対応');
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                });
+                initialLat = position.coords.latitude;
+                initialLon = position.coords.longitude;
+                myLocationCoords = { lat: initialLat, lon: initialLon };
+                document.getElementById('myLocationText').textContent = `${initialLat.toFixed(5)}, ${initialLon.toFixed(5)}`;
+                
+                if (myLocationEntity) viewer.entities.remove(myLocationEntity); 
+                myLocationEntity = viewer.entities.add({ 
+                    position: Cesium.Cartesian3.fromDegrees(initialLon, initialLat), 
+                    billboard: { image: createMyLocationIcon(), width: 24, height: 24, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } 
+                });
+            } catch(e) {
+                document.getElementById('myLocationText').textContent = '取得失敗';
+            }
+            
+            showLoading(true, 'カメラを移動中...', 40);
+            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 3000) });
+            
+            // 登山道を読み込み
+            showLoading(true, '登山道データを読み込み中...', 60);
+            layers.trails = true;
+            document.getElementById('trailToggle').classList.add('active');
+            
+            await loadTrailsForArea(initialLat, initialLon);
+            
+            showLoading(true, '完了', 100);
+            setTimeout(() => showLoading(false), 500);
+        }
+        
+        // アプリ初期化実行
+        initializeApp();
+        
         function createMyLocationIcon() { const c = document.createElement('canvas'); c.width = 24; c.height = 24; const ctx = c.getContext('2d'); ctx.beginPath(); ctx.arc(12, 12, 10, 0, Math.PI * 2); ctx.fillStyle = '#4ade80'; ctx.fill(); ctx.beginPath(); ctx.arc(12, 12, 5, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); return c.toDataURL(); }
-        goToMyLocation();
         function updateScaleBar() { try { const width = viewer.canvas.clientWidth; const left = viewer.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.3, viewer.canvas.clientHeight / 2)); const right = viewer.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.7, viewer.canvas.clientHeight / 2)); if (!left || !right) return; const leftPos = viewer.scene.globe.pick(left, viewer.scene); const rightPos = viewer.scene.globe.pick(right, viewer.scene); if (!leftPos || !rightPos) return; const distance = Cesium.Cartesian3.distance(leftPos, rightPos) / 2; let scaleValue = distance * (60 / (width * 0.2)); const scales = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]; let best = scales[0]; for (const s of scales) { if (scaleValue >= s) best = s; } const scaleWidth = Math.round(60 * (best / scaleValue)); document.getElementById('scaleLine').style.width = Math.max(30, Math.min(80, scaleWidth)) + 'px'; document.getElementById('scaleText').textContent = best >= 1000 ? (best/1000) + 'km' : best + 'm'; } catch(e) {} }
         viewer.camera.moveEnd.addEventListener(updateScaleBar); setTimeout(updateScaleBar, 3000);
         
@@ -810,7 +879,12 @@
         // ユーティリティ
         function geodesicDistance(lon1, lat1, lon2, lat2) { return new Cesium.EllipsoidGeodesic(Cesium.Cartographic.fromDegrees(lon1, lat1), Cesium.Cartographic.fromDegrees(lon2, lat2)).surfaceDistance; }
         function formatDistance(m) { return m >= 1000 ? (m/1000).toFixed(2) + 'km' : m.toFixed(0) + 'm'; }
-        function showLoading(show) { document.getElementById('loading').classList.toggle('show', show); }
+        function showLoading(show, message, progress) { 
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.classList.toggle('show', show); 
+            if (message) document.getElementById('loadingMessage').textContent = message;
+            if (progress !== undefined) document.getElementById('loadingProgress').style.width = progress + '%';
+        }
         function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
         function showMarkerInfo(name, lat, lon, height, screenPos) {
             const popup = document.getElementById('markerPopup');

@@ -530,16 +530,31 @@
             const prev = hoseSimState.colorizedLinesByLine.get(lineId) || []; 
             prev.forEach(e => viewer.entities.remove(e)); 
             const lines = []; 
-            // リレーインデックス + 最終地点
-            const breakPoints = [0, ...relays.map(r => r.index), interpolated.length - 1];
-            for (let p = 0; p < pumpSegments.length; p++) { 
+            
+            // pumpSegmentsに対応するインデックスを計算
+            // セグメント0: 0 → relay[0].index (または最後まで)
+            // セグメント1: relay[0].index → relay[1].index (または最後まで)
+            // ...
+            const numSegments = pumpSegments.length;
+            
+            for (let p = 0; p < numSegments; p++) { 
                 const seg = pumpSegments[p]; 
-                const startIdx = breakPoints[p]; 
-                const endIdx = breakPoints[p + 1]; 
+                let startIdx, endIdx;
+                
+                if (p === 0) {
+                    startIdx = 0;
+                    endIdx = relays.length > 0 ? relays[0].index : interpolated.length - 1;
+                } else {
+                    startIdx = relays[p - 1].index;
+                    endIdx = p < relays.length ? relays[p].index : interpolated.length - 1;
+                }
+                
                 const color = seg.remainingPressure >= 0.4 ? Cesium.Color.LIMEGREEN : seg.remainingPressure >= 0.2 ? Cesium.Color.YELLOW : Cesium.Color.RED; 
                 const positions = []; 
                 for (let i = startIdx; i <= endIdx; i++) {
-                    positions.push(Cesium.Cartesian3.fromDegrees(interpolated[i].lon, interpolated[i].lat, interpolated[i].height || 0)); 
+                    if (interpolated[i]) {
+                        positions.push(Cesium.Cartesian3.fromDegrees(interpolated[i].lon, interpolated[i].lat, interpolated[i].height || 0)); 
+                    }
                 }
                 if (positions.length >= 2) {
                     lines.push(viewer.entities.add({ id: lineId, polyline: { positions, width: 5, material: color.withAlpha(0.85), clampToGround: true } })); 

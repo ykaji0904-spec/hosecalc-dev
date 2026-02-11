@@ -477,45 +477,53 @@
         
         // 高速登山道読み込み
         async function loadTrailsFast(lat, lon) {
-            const radius = 0.06; // 約6.5km（軽量化）
+            const radius = 0.045; // 約5km（さらに軽量化）
             const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
             const server = servers[Math.floor(Math.random() * servers.length)];
             
-            const bbox = `${lat-radius},${lon-radius},${lat+radius},${lon+radius}`;
-            const query = `[out:json][timeout:10];way["highway"~"path|track"](${bbox});out body;>;out skel qt;`;
-            
-            showLoading(true, 'サーバーに接続中...', 50);
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-            
-            const res = await fetch(`${server}?data=${encodeURIComponent(query)}`, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            
-            showLoading(true, 'データを処理中...', 70);
-            const data = await res.json();
-            
-            const nodes = new Map();
-            data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
-            const ways = data.elements.filter(e => e.type === 'way');
-            
-            showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
-            
-            ways.forEach(way => {
-                const pos = way.nodes.filter(nid => nodes.has(nid)).map(nid => {
-                    const n = nodes.get(nid);
-                    return Cesium.Cartesian3.fromDegrees(n[0], n[1]);
-                });
-                if (pos.length >= 2) {
-                    const e = viewer.entities.add({
-                        polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true }
+            try {
+                const bbox = `${lat-radius},${lon-radius},${lat+radius},${lon+radius}`;
+                const query = `[out:json][timeout:8];way["highway"="path"](${bbox});out body;>;out skel qt;`;
+                
+                showLoading(true, 'サーバーに接続中...', 50);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                
+                const res = await fetch(`${server}?data=${encodeURIComponent(query)}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) throw new Error('Server error');
+                
+                showLoading(true, 'データを処理中...', 70);
+                const data = await res.json();
+                
+                const nodes = new Map();
+                data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
+                const ways = data.elements.filter(e => e.type === 'way');
+                
+                showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
+                
+                ways.forEach(way => {
+                    const pos = way.nodes.filter(nid => nodes.has(nid)).map(nid => {
+                        const n = nodes.get(nid);
+                        return Cesium.Cartesian3.fromDegrees(n[0], n[1]);
                     });
-                    e.show = layers.trails;
-                    e.osmId = way.id;
-                    trailEntities.push(e);
-                }
-            });
-            
-            if (ways.length > 0) showToast(`登山道 ${ways.length}本を読み込みました`);
+                    if (pos.length >= 2) {
+                        const e = viewer.entities.add({
+                            polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true }
+                        });
+                        e.show = layers.trails;
+                        e.osmId = way.id;
+                        trailEntities.push(e);
+                    }
+                });
+                
+                if (ways.length > 0) showToast(`登山道 ${ways.length}本を読み込みました`);
+                else showToast('登山道データなし（移動後にメニューから読込可）');
+            } catch(e) {
+                console.error('Trail load error:', e);
+                showToast('登山道はメニューから読み込めます');
+            }
         }
         
         // アプリ初期化実行

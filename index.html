@@ -15,6 +15,11 @@
     <meta property="og:url" content="https://hosecalc-dev.pages.dev">
     <meta property="og:site_name" content="HoseCalc">
     <meta property="og:locale" content="ja_JP">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HoseCalc">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23ff6600' rx='20' width='100' height='100'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>🔥</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAF6klEQVR4nO3dW3LiMBBG4XYqO5o9ZVHZU9bEPClliAFdWpf+db7nwcj4TCOcKjhsotuX3WY+P/o5vu2Y8ryjnoh4MSLyrk9AxHimV9xdDkrIyOUdtuvBCBm1vMJ2OQghw0tr2B+tCyBmeGrtqSloYkYPLV1VjXdCxiilW5DiCU3MGKm0t6KgiRkzlHSXHTQxY6bc/rKCJmasIKfDt0ETM1byrsfm+9DASl4GzXTGil51+TRoYsbKnvV5GTQxI4KrTtlDQ8qfoJnOiOSxVyY0pNwFzXRGROdumdCQ8hs00xmRpX6Z0JBC0JBymLHdgA4mNKQQNKQQNKQQNKR88IEQSpjQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkELQkPI5ewFyvioe8+2+im0RdIuaeHOPQ+RVCLqUV8Qlz0Pc2Qg6x6iIc56fuF8i6Fdmh3wlrYmwLxH0lRVDfkTYlwj6LELIjwj7Dvehk4gxn0VfvxMmtFIITOvNJ7RSzGeq55Vh3wnd86L/FPzbf53W8GVbTupju5+k8A65JN5c3pFvFPZeWw7PmH+sT8w9jr3RFmSfCe1xUXsFnMNjam8wqfeY0K0x95zGI9ewwaTWD9oj5pUQ9Uv73uV4Z7WQz9Laet0hCUx7QtdOo5VjPqtdp/CU1o3aPWYE6K+oxn0LjEnRH2LPXTiHXPO8Tz3wD/OxwtK7z50zdTxiNnjGB5B1hxD6P601pZjRsye96g9jlXzeMTz23mxVw9ttx4xP+utC8xf/lhKO2wCTY36s3zfdRK6/1+4qJlOxhfwLMhE9/M6fYQtwIKGBB6tGYGHLGwAAAAASUVORK5CYII=">
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.95/Build/Cesium/Cesium.js"></script>
     <link href="https://cesium.com/downloads/cesiumjs/releases/1.95/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
@@ -436,27 +441,43 @@
         
         // 初期化関数
         async function initializeApp() {
+            console.log('initializeApp started');
             showLoading(true, '地図を初期化中...', 20);
             
-            // デフォルト位置: 広島市中心部
-            const initialLat = 34.3853, initialLon = 132.4553;
+            // 最大10秒でローディングを強制終了するフェイルセーフ
+            const failsafeTimeout = setTimeout(() => {
+                console.log('Failsafe: force close loading');
+                showLoading(false);
+                showToast('初期化完了（一部スキップ）');
+            }, 10000);
             
-            // カメラを即座に設定
-            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 5000) });
-            
-            showLoading(true, '登山道を読み込み中...', 40);
-            layers.trails = true;
-            document.getElementById('trailToggle').classList.add('active');
-            
-            // 登山道を読み込み（エラーでも続行）
             try {
+                // デフォルト位置: 広島市中心部
+                const initialLat = 34.3853, initialLon = 132.4553;
+                
+                // カメラを即座に設定
+                console.log('Setting camera...');
+                viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 5000) });
+                
+                showLoading(true, '登山道を読み込み中...', 40);
+                layers.trails = true;
+                document.getElementById('trailToggle').classList.add('active');
+                
+                // 登山道を読み込み（エラーでも続行）
+                console.log('Loading trails...');
                 await loadTrailsFast(initialLat, initialLon);
+                console.log('Trails loaded');
+                
+                clearTimeout(failsafeTimeout);
+                showLoading(true, '完了！', 100);
+                setTimeout(() => showLoading(false), 300);
+                
             } catch(e) {
-                console.error('Trail load failed:', e);
+                console.error('initializeApp error:', e);
+                clearTimeout(failsafeTimeout);
+                showLoading(false);
+                showToast('初期化エラー');
             }
-            
-            showLoading(true, '完了！', 100);
-            setTimeout(() => showLoading(false), 300);
             
             // 位置情報は後からバックグラウンドで取得
             setTimeout(() => {

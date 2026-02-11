@@ -21,8 +21,8 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Noto Sans JP',sans-serif;overflow:hidden;background:#000;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-        #cesiumContainer{width:100vw;height:100vh;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+        body{font-family:'Noto Sans JP',sans-serif;overflow:hidden;background:#000}
+        #cesiumContainer{width:100vw;height:100vh}
         .top-bar{position:fixed;top:0;left:0;right:0;height:52px;background:rgba(15,15,15,0.95);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1000}
         .logo{display:flex;align-items:center;gap:10px}
         .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#ff6b35,#f7931e);border-radius:10px;display:flex;align-items:center;justify-content:center}
@@ -234,7 +234,7 @@
             baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
             navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
             infoBox: false, selectionIndicator: false,
-            requestRenderMode: true, maximumRenderTimeChange: Infinity,
+            requestRenderMode: false,
             targetFrameRate: 30, msaaSamples: 1
         });
         viewer.scene.globe.tileCacheSize = 1000;
@@ -531,22 +531,25 @@
             prev.forEach(e => viewer.entities.remove(e)); 
             const lines = []; 
             
-            // 全セグメントを1本のポリラインで描画（複数エンティティの問題を回避）
-            for (let p = 0; p < pumpSegments.length; p++) { 
+            // セグメントごとにポリラインを作成
+            const numSegments = pumpSegments.length;
+            console.log('Rendering segments:', numSegments, 'relays:', relays.length);
+            
+            for (let p = 0; p < numSegments; p++) { 
                 const seg = pumpSegments[p]; 
                 let startIdx, endIdx;
                 
                 if (p === 0) {
                     startIdx = 0;
-                } else {
+                    endIdx = relays.length > 0 ? relays[0].index : interpolated.length - 1;
+                } else if (p <= relays.length) {
                     startIdx = relays[p - 1].index;
+                    endIdx = p < relays.length ? relays[p].index : interpolated.length - 1;
+                } else {
+                    continue;
                 }
                 
-                if (p < relays.length) {
-                    endIdx = relays[p].index;
-                } else {
-                    endIdx = interpolated.length - 1;
-                }
+                console.log('Segment', p, ': startIdx=', startIdx, 'endIdx=', endIdx);
                 
                 const color = seg.remainingPressure >= 0.4 ? Cesium.Color.LIMEGREEN : seg.remainingPressure >= 0.2 ? Cesium.Color.YELLOW : Cesium.Color.RED; 
                 const positions = []; 
@@ -555,21 +558,28 @@
                         positions.push(Cesium.Cartesian3.fromDegrees(interpolated[i].lon, interpolated[i].lat, interpolated[i].height || 0)); 
                     }
                 }
+                console.log('Segment', p, 'positions:', positions.length);
+                
                 if (positions.length >= 2) {
                     const entity = viewer.entities.add({ 
-                        id: lineId,
+                        id: lineId + '-seg-' + p,
                         polyline: { 
                             positions: positions, 
-                            width: 8,
-                            material: color.withAlpha(0.85), 
+                            width: 8, 
+                            material: color.withAlpha(0.9), 
                             clampToGround: true 
                         } 
                     }); 
                     lines.push(entity);
                 }
             } 
+            
             hoseSimState.colorizedLinesByLine.set(lineId, lines); 
-            viewer.scene.requestRender();
+            
+            // 強制的に再描画をスケジュール
+            setTimeout(function() {
+                viewer.scene.requestRender();
+            }, 100);
         }
         function interpolatePath(points, interval) { const result = []; let cumulative = 0; result.push({ ...points[0], distFromStart: 0 }); for (let i = 1; i < points.length; i++) { const p1 = points[i - 1], p2 = points[i]; const segDist = geodesicDistance(p1.lon, p1.lat, p2.lon, p2.lat); const segElev = (p2.height || 0) - (p1.height || 0); const steps = Math.ceil(segDist / interval); for (let s = 1; s <= steps; s++) { const t = s / steps; cumulative += segDist / steps; result.push({ lon: p1.lon + (p2.lon - p1.lon) * t, lat: p1.lat + (p2.lat - p1.lat) * t, height: (p1.height || 0) + segElev * t, distFromStart: cumulative }); } } return result; }
         function calcLossForDistance(dist, dh, params) { const hoses = dist / params.hoseLengthM; const frictionLoss = hoses * params.lossPerHoseMPa; const elevLoss = dh > 0 ? dh * 0.01 : dh * 0.01 / 3; return frictionLoss + elevLoss; }
@@ -641,19 +651,13 @@
         
         handler.setInputAction(async function(click) { 
             if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } 
-            
-            // drillPickで複数オブジェクトを検出（ラインのタップ検出を強化）
-            const pickedObjects = viewer.scene.drillPick(click.position);
-            for (const picked of pickedObjects) {
-                if (picked && picked.id) { 
-                    const entity = picked.id;
-                    const pickedId = typeof entity.id === 'string' ? entity.id : (typeof entity === 'string' ? entity : '');
-                    if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; } 
-                    if (pickedId.startsWith('water-')) { selectWater(pickedId); return; } 
-                    if (pickedId.startsWith('hose-')) { selectHoseLine(pickedId); return; } 
-                }
-            }
-            
+            const picked = viewer.scene.pick(click.position); 
+            if (picked && picked.id) { 
+                const pickedId = typeof picked.id.id === 'string' ? picked.id.id : ''; 
+                if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; } 
+                if (pickedId.startsWith('water-')) { selectWater(pickedId); return; } 
+                if (pickedId.startsWith('hose-')) { selectHoseLine(pickedId); return; } 
+            } 
             const ray = viewer.camera.getPickRay(click.position); 
             const cartesian = viewer.scene.globe.pick(ray, viewer.scene); 
             if (!cartesian) return; 

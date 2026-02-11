@@ -130,14 +130,9 @@
         .segment-table tr.red td{background:rgba(239,68,68,0.1)}
         .segment-table .elev-up{color:#ef4444}
         .segment-table .elev-down{color:#4ade80}
-        .sim-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px;background:rgba(255,255,255,0.05);border-radius:6px}
-        .sim-legend-title{width:100%;color:rgba(255,255,255,0.6);font-size:10px;margin-bottom:4px;font-weight:500}
+        .sim-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1)}
         .legend-item{display:flex;align-items:center;gap:3px;font-size:9px;color:rgba(255,255,255,0.6)}
         .legend-dot{width:8px;height:8px;border-radius:50%}
-        .legend-line{width:20px;height:4px;border-radius:2px}
-        .legend-line.green{background:#4ade80}
-        .legend-line.yellow{background:#fbbf24}
-        .legend-line.red{background:#ef4444}
         .legend-dot.green{background:#4ade80}
         .legend-dot.yellow{background:#fbbf24}
         .legend-dot.red{background:#ef4444}
@@ -224,7 +219,7 @@
     </div>
     <div class="bottom-panel fire" id="firePanel"><div class="panel-header"><span class="panel-title fire"><span class="material-icons">local_fire_department</span>火点</span><button class="panel-close" onclick="closePanel('fire')"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">緯度</div><div class="panel-stat-value copyable" id="fireLat" onclick="copyText(this)">-</div></div><div class="panel-stat"><div class="panel-stat-label">経度</div><div class="panel-stat-value copyable" id="fireLon" onclick="copyText(this)">-</div></div><div class="panel-stat"><div class="panel-stat-label">標高</div><div class="panel-stat-value fire-highlight" id="fireElev">-</div></div></div><div class="panel-actions"><button class="panel-btn danger" onclick="deleteSelectedFire()"><span class="material-icons">delete</span>削除</button></div></div>
     <div class="bottom-panel water" id="waterPanel"><div class="panel-header"><span class="panel-title water"><span class="material-icons">water_drop</span>水利</span><button class="panel-close" onclick="closePanel('water')"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">種別</div><div class="panel-stat-value water-highlight" id="waterType">-</div></div><div class="panel-stat"><div class="panel-stat-label">緯度</div><div class="panel-stat-value copyable" id="waterLat" onclick="copyText(this)">-</div></div><div class="panel-stat"><div class="panel-stat-label">経度</div><div class="panel-stat-value copyable" id="waterLon" onclick="copyText(this)">-</div></div></div><div class="panel-actions"><button class="panel-btn danger" onclick="deleteSelectedWater()"><span class="material-icons">delete</span>削除</button></div></div>
-    <div class="bottom-panel hose-info" id="hoseInfoPanel"><div class="panel-header"><span class="panel-title hose"><span class="material-icons">route</span>ホース延長シミュレーション</span><button class="panel-close" onclick="closePanel('hoseInfo')"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">総延長</div><div class="panel-stat-value highlight" id="hoseInfoDist">-</div></div><div class="panel-stat"><div class="panel-stat-label">ホース</div><div class="panel-stat-value" id="hoseInfoCount">-</div></div><div class="panel-stat"><div class="panel-stat-label">可搬台数</div><div class="panel-stat-value" id="hoseInfoRelay">-</div></div><div class="panel-stat"><div class="panel-stat-label">筒先圧</div><div class="panel-stat-value" id="hoseInfoEndP">-</div></div></div><div class="section-title" style="margin-top:8px">区間詳細</div><div class="segment-table-wrap"><table class="segment-table"><thead><tr><th>区間</th><th>距離</th><th>本数</th><th>高低差</th><th>損失</th><th>残圧</th></tr></thead><tbody id="segmentTableBody"></tbody></table></div><div class="sim-legend"><div class="sim-legend-title">■ マップ上の色分け（残圧）</div><div class="legend-item"><div class="legend-line green"></div>≥0.4MPa 良好</div><div class="legend-item"><div class="legend-line yellow"></div>0.2-0.4MPa 注意</div><div class="legend-item"><div class="legend-line red"></div>&lt;0.2MPa 不足</div><div class="legend-item"><div class="legend-dot conf"></div>可搬ポンプ</div><div class="legend-item"><div class="legend-dot end"></div>筒先</div></div><div class="sim-params"><div class="sim-params-title">計算条件</div><div class="sim-param-grid"><div class="sim-param-item"><label>消防車</label><div class="sim-param-input-wrap"><input type="number" id="paramPumpOut" value="1.2" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>可搬ポンプ</label><div class="sim-param-input-wrap"><input type="number" id="paramRelayOut" value="0.8" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>受水圧</label><div class="sim-param-input-wrap"><input type="number" id="paramInlet" value="0.2" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>筒先圧</label><div class="sim-param-input-wrap"><input type="number" id="paramNozzle" value="0.4" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>損失/本</label><div class="sim-param-input-wrap"><input type="number" id="paramLossPerHose" value="0.02" step="0.005"><span>MPa</span></div></div></div><button class="recalc-btn" onclick="onParamChange()"><span class="material-icons">refresh</span>再計算</button></div><div class="panel-actions"><button class="panel-btn danger" onclick="deleteSelectedHose()"><span class="material-icons">delete</span>削除</button></div></div>
+    <div class="bottom-panel hose-info" id="hoseInfoPanel"><div class="panel-header"><span class="panel-title hose"><span class="material-icons">route</span>ホース延長シミュレーション</span><button class="panel-close" onclick="closePanel('hoseInfo')"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">総延長</div><div class="panel-stat-value highlight" id="hoseInfoDist">-</div></div><div class="panel-stat"><div class="panel-stat-label">ホース</div><div class="panel-stat-value" id="hoseInfoCount">-</div></div><div class="panel-stat"><div class="panel-stat-label">可搬台数</div><div class="panel-stat-value" id="hoseInfoRelay">-</div></div><div class="panel-stat"><div class="panel-stat-label">筒先圧</div><div class="panel-stat-value" id="hoseInfoEndP">-</div></div></div><div class="section-title" style="margin-top:8px">区間詳細</div><div class="segment-table-wrap"><table class="segment-table"><thead><tr><th>区間</th><th>距離</th><th>本数</th><th>高低差</th><th>損失</th><th>残圧</th></tr></thead><tbody id="segmentTableBody"></tbody></table></div><div class="sim-legend"><div class="legend-item"><div class="legend-dot conf"></div>可搬</div><div class="legend-item"><div class="legend-dot end"></div>筒先</div><div class="legend-item"><div class="legend-dot green"></div>≥0.4</div><div class="legend-item"><div class="legend-dot yellow"></div>≥0.2</div><div class="legend-item"><div class="legend-dot red"></div>&lt;0.2</div></div><div class="sim-params"><div class="sim-params-title">計算条件</div><div class="sim-param-grid"><div class="sim-param-item"><label>消防車</label><div class="sim-param-input-wrap"><input type="number" id="paramPumpOut" value="1.2" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>可搬ポンプ</label><div class="sim-param-input-wrap"><input type="number" id="paramRelayOut" value="0.8" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>受水圧</label><div class="sim-param-input-wrap"><input type="number" id="paramInlet" value="0.2" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>筒先圧</label><div class="sim-param-input-wrap"><input type="number" id="paramNozzle" value="0.4" step="0.05"><span>MPa</span></div></div><div class="sim-param-item"><label>損失/本</label><div class="sim-param-input-wrap"><input type="number" id="paramLossPerHose" value="0.02" step="0.005"><span>MPa</span></div></div></div><button class="recalc-btn" onclick="onParamChange()"><span class="material-icons">refresh</span>再計算</button></div><div class="panel-actions"><button class="panel-btn danger" onclick="deleteSelectedHose()"><span class="material-icons">delete</span>削除</button></div></div>
     <div class="bottom-panel hose" id="hosePanel"><div class="panel-header"><span class="panel-title hose"><span class="material-icons">route</span>ホース延長(林野)</span><button class="panel-close" onclick="closeHosePanel()"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">総延長</div><div class="panel-stat-value highlight" id="hoseTotalDist">0m</div></div><div class="panel-stat"><div class="panel-stat-label">本数(20m)</div><div class="panel-stat-value" id="hoseTotalCount">0本</div></div><div class="panel-stat"><div class="panel-stat-label">高低差</div><div class="panel-stat-value" id="hoseElevInfo">-</div></div></div><div class="panel-hint" id="hoseHint">連続タップでポイント追加</div><div class="panel-actions"><button class="panel-btn secondary" onclick="undoHosePoint()"><span class="material-icons">undo</span>戻す</button><button class="panel-btn danger" onclick="resetHoseLine()"><span class="material-icons">delete</span></button><button class="panel-btn primary" onclick="confirmHoseLine()"><span class="material-icons">check</span>確定</button></div></div>
     <div class="bottom-panel measure" id="measurePanel"><div class="panel-header"><span class="panel-title measure"><span class="material-icons">straighten</span>2点計測</span><button class="panel-close" onclick="closeMeasurePanel()"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">地表距離</div><div class="panel-stat-value highlight" id="measureDistance">-</div></div><div class="panel-stat"><div class="panel-stat-label">直線距離</div><div class="panel-stat-value" id="measureStraight">-</div></div><div class="panel-stat"><div class="panel-stat-label">高低差</div><div class="panel-stat-value" id="measureElev">-</div></div></div><div class="panel-hint" id="measureHint">2点をタップして計測</div><div class="panel-actions"><button class="panel-btn secondary" onclick="resetMeasure()"><span class="material-icons">refresh</span>リセット</button></div></div>
     <div class="map-info"><div class="scale-bar"><div class="scale-line" id="scaleLine"></div><span class="scale-text" id="scaleText">--</span></div><div class="credit-bar" id="creditBar">© Cesium Ion</div></div>
@@ -536,9 +531,8 @@
             prev.forEach(e => viewer.entities.remove(e)); 
             const lines = []; 
             
-            // セグメントごとにポリラインを作成
+            // 各ポイントの圧力を計算して色分け
             const numSegments = pumpSegments.length;
-            console.log('Rendering segments:', numSegments, 'relays:', relays.length);
             
             for (let p = 0; p < numSegments; p++) { 
                 const seg = pumpSegments[p]; 
@@ -554,34 +548,86 @@
                     continue;
                 }
                 
-                console.log('Segment', p, ': startIdx=', startIdx, 'endIdx=', endIdx);
+                // この区間の開始圧力（消防車は1.2MPa、可搬は0.8MPa）
+                const startPressure = p === 0 ? hoseParams.pumpOutputMPa : hoseParams.relayOutputMPa;
+                const startDist = interpolated[startIdx].distFromStart;
+                const startHeight = interpolated[startIdx].height || 0;
                 
-                const color = seg.remainingPressure >= 0.4 ? Cesium.Color.LIMEGREEN : seg.remainingPressure >= 0.2 ? Cesium.Color.YELLOW : Cesium.Color.RED; 
-                const positions = []; 
+                // 区間内を細かく分割して圧力に応じた色で描画
+                let currentColorStart = startIdx;
+                let currentColor = null;
+                
                 for (let i = startIdx; i <= endIdx; i++) {
-                    if (interpolated[i]) {
-                        positions.push(Cesium.Cartesian3.fromDegrees(interpolated[i].lon, interpolated[i].lat, interpolated[i].height || 0)); 
+                    // このポイントまでの圧力損失を計算
+                    const dist = interpolated[i].distFromStart - startDist;
+                    const dh = (interpolated[i].height || 0) - startHeight;
+                    const loss = calcLossForDistance(dist, dh, hoseParams);
+                    const pressure = startPressure - loss;
+                    
+                    // 圧力に応じた色を決定
+                    let newColor;
+                    if (pressure >= 0.4) {
+                        newColor = 'green';
+                    } else if (pressure >= 0.2) {
+                        newColor = 'yellow';
+                    } else {
+                        newColor = 'red';
                     }
+                    
+                    // 色が変わったら、前の区間を描画
+                    if (currentColor !== null && newColor !== currentColor) {
+                        const positions = [];
+                        for (let j = currentColorStart; j <= i; j++) {
+                            if (interpolated[j]) {
+                                positions.push(Cesium.Cartesian3.fromDegrees(interpolated[j].lon, interpolated[j].lat, interpolated[j].height || 0));
+                            }
+                        }
+                        if (positions.length >= 2) {
+                            const cesiumColor = currentColor === 'green' ? Cesium.Color.LIMEGREEN : 
+                                               currentColor === 'yellow' ? Cesium.Color.YELLOW : Cesium.Color.RED;
+                            const entity = viewer.entities.add({
+                                id: lineId + '-seg-' + p + '-' + currentColorStart,
+                                polyline: {
+                                    positions: positions,
+                                    width: 5,
+                                    material: cesiumColor.withAlpha(0.9),
+                                    clampToGround: true
+                                }
+                            });
+                            lines.push(entity);
+                        }
+                        currentColorStart = i;
+                    }
+                    currentColor = newColor;
                 }
-                console.log('Segment', p, 'positions:', positions.length);
                 
-                if (positions.length >= 2) {
-                    const entity = viewer.entities.add({ 
-                        id: lineId + '-seg-' + p,
-                        polyline: { 
-                            positions: positions, 
-                            width: 5, 
-                            material: color.withAlpha(0.9), 
-                            clampToGround: true 
-                        } 
-                    }); 
-                    lines.push(entity);
+                // 最後の区間を描画
+                if (currentColorStart < endIdx) {
+                    const positions = [];
+                    for (let j = currentColorStart; j <= endIdx; j++) {
+                        if (interpolated[j]) {
+                            positions.push(Cesium.Cartesian3.fromDegrees(interpolated[j].lon, interpolated[j].lat, interpolated[j].height || 0));
+                        }
+                    }
+                    if (positions.length >= 2) {
+                        const cesiumColor = currentColor === 'green' ? Cesium.Color.LIMEGREEN : 
+                                           currentColor === 'yellow' ? Cesium.Color.YELLOW : Cesium.Color.RED;
+                        const entity = viewer.entities.add({
+                            id: lineId + '-seg-' + p + '-' + currentColorStart,
+                            polyline: {
+                                positions: positions,
+                                width: 5,
+                                material: cesiumColor.withAlpha(0.9),
+                                clampToGround: true
+                            }
+                        });
+                        lines.push(entity);
+                    }
                 }
             } 
             
             hoseSimState.colorizedLinesByLine.set(lineId, lines); 
             
-            // 強制的に再描画をスケジュール
             setTimeout(function() {
                 viewer.scene.requestRender();
             }, 100);

@@ -21,8 +21,8 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Noto Sans JP',sans-serif;overflow:hidden;background:#000}
-        #cesiumContainer{width:100vw;height:100vh}
+        body{font-family:'Noto Sans JP',sans-serif;overflow:hidden;background:#000;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+        #cesiumContainer{width:100vw;height:100vh;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
         .top-bar{position:fixed;top:0;left:0;right:0;height:52px;background:rgba(15,15,15,0.95);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1000}
         .logo{display:flex;align-items:center;gap:10px}
         .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#ff6b35,#f7931e);border-radius:10px;display:flex;align-items:center;justify-content:center}
@@ -557,9 +557,10 @@
                 }
                 if (positions.length >= 2) {
                     const entity = viewer.entities.add({ 
+                        id: lineId,
                         polyline: { 
                             positions: positions, 
-                            width: 5, 
+                            width: 8,
                             material: color.withAlpha(0.85), 
                             clampToGround: true 
                         } 
@@ -640,13 +641,19 @@
         
         handler.setInputAction(async function(click) { 
             if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } 
-            const picked = viewer.scene.pick(click.position); 
-            if (picked && picked.id) { 
-                const pickedId = typeof picked.id.id === 'string' ? picked.id.id : ''; 
-                if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; } 
-                if (pickedId.startsWith('water-')) { selectWater(pickedId); return; } 
-                if (pickedId.startsWith('hose-')) { selectHoseLine(pickedId); return; } 
-            } 
+            
+            // drillPickで複数オブジェクトを検出（ラインのタップ検出を強化）
+            const pickedObjects = viewer.scene.drillPick(click.position);
+            for (const picked of pickedObjects) {
+                if (picked && picked.id) { 
+                    const entity = picked.id;
+                    const pickedId = typeof entity.id === 'string' ? entity.id : (typeof entity === 'string' ? entity : '');
+                    if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; } 
+                    if (pickedId.startsWith('water-')) { selectWater(pickedId); return; } 
+                    if (pickedId.startsWith('hose-')) { selectHoseLine(pickedId); return; } 
+                }
+            }
+            
             const ray = viewer.camera.getPickRay(click.position); 
             const cartesian = viewer.scene.globe.pick(ray, viewer.scene); 
             if (!cartesian) return; 

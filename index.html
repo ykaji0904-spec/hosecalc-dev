@@ -367,24 +367,28 @@
             catch(e) { console.warn('Buildings:', e); } 
         }
         
-        // 修正2,3,4: 登山道読み込み（半径9km、登山道のみ）
+        // 修正2,3,4: 登山道読み込み（半径7km）
         async function loadTrails() { 
             if (trailLoadActive) return; 
             const c = viewer.camera.positionCartographic;
             const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
-            const radius = 0.08; // 約9km
+            const radius = 0.065; // 約7km
             trailLoadActive = true; 
             showLoading(true, '登山道を読み込み中...', 30); 
             const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']; 
             const server = servers[Math.floor(Math.random() * servers.length)]; 
             try { 
                 const bbox = `${lat-radius},${lon-radius},${lat+radius},${lon+radius}`; 
-                // 登山道のみ: sac_scale(登山グレード)、trail_visibility、または林道(grade3以上)
-                const query = `[out:json][timeout:20];(way["highway"="path"]["sac_scale"](${bbox});way["highway"="track"]["tracktype"~"grade3|grade4|grade5"](${bbox});way["highway"="path"]["trail_visibility"](${bbox}););out body;>;out skel qt;`; 
+                const query = `[out:json][timeout:20];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out body;>;out skel qt;`; 
                 const controller = new AbortController(); 
                 const timeoutId = setTimeout(() => controller.abort(), 18000); 
                 showLoading(true, 'サーバーに接続中...', 50);
-                const res = await fetch(`${server}?data=${encodeURIComponent(query)}`, { signal: controller.signal }); 
+                const res = await fetch(server, {
+                    method: 'POST',
+                    body: 'data=' + encodeURIComponent(query),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    signal: controller.signal
+                }); 
                 clearTimeout(timeoutId); 
                 showLoading(true, 'データを処理中...', 70);
                 const data = await res.json(); 
@@ -402,6 +406,7 @@
                     } 
                 }); 
                 
+                viewer.scene.requestRender();
                 showLoading(true, '完了', 100);
                 if (ways.length > 0) showToast(`登山道 ${ways.length}本`); 
                 else showToast('この範囲に登山道データがありません');
@@ -440,42 +445,46 @@
         // 初期化関数
         async function initializeApp() {
             console.log('initializeApp started');
-            showLoading(true, '地図を初期化中...', 20);
+            showLoading(true, '地図を読み込み中...', 10);
             
-            // 最大15秒でローディングを強制終了するフェイルセーフ
-            const failsafeTimeout = setTimeout(() => {
-                console.log('Failsafe: force close loading');
-                showLoading(false);
-                // フェイルセーフ発動時はトーストを出さない（地図は表示されている）
-            }, 15000);
+            // デフォルト位置: 広島市中心部
+            const initialLat = 34.3853, initialLon = 132.4553;
             
-            try {
-                // デフォルト位置: 広島市中心部
-                const initialLat = 34.3853, initialLon = 132.4553;
+            // カメラを設定
+            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 5000) });
+            
+            // Cesiumの地形タイル読み込み完了を待つ
+            await new Promise(resolve => {
+                let checkCount = 0;
+                const maxChecks = 50; // 最大5秒
                 
-                // カメラを即座に設定
-                console.log('Setting camera...');
-                viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 5000) });
+                const checkTiles = () => {
+                    checkCount++;
+                    const tilesLoading = viewer.scene.globe.tilesLoaded;
+                    showLoading(true, '地形データを読み込み中...', 10 + Math.min(checkCount * 2, 40));
+                    
+                    if (tilesLoading || checkCount >= maxChecks) {
+                        console.log('Tiles loaded or timeout, count:', checkCount);
+                        resolve();
+                    } else {
+                        setTimeout(checkTiles, 100);
+                    }
+                };
                 
-                showLoading(true, '登山道を読み込み中...', 40);
-                layers.trails = true;
-                document.getElementById('trailToggle').classList.add('active');
-                
-                // 登山道を読み込み（エラーでも続行）
-                console.log('Loading trails...');
-                await loadTrailsFast(initialLat, initialLon);
-                console.log('Trails loaded');
-                
-                clearTimeout(failsafeTimeout);
-                showLoading(true, '完了！', 100);
-                setTimeout(() => showLoading(false), 300);
-                
-            } catch(e) {
-                console.error('initializeApp error:', e);
-                clearTimeout(failsafeTimeout);
-                showLoading(false);
-                // エラーでも地図は表示されているのでトーストは出さない
-            }
+                // 少し待ってからチェック開始
+                setTimeout(checkTiles, 500);
+            });
+            
+            console.log('Cesium ready, loading trails...');
+            showLoading(true, '登山道を読み込み中...', 50);
+            layers.trails = true;
+            document.getElementById('trailToggle').classList.add('active');
+            
+            // 登山道を読み込み
+            await loadTrailsFast(initialLat, initialLon);
+            
+            showLoading(true, '完了！', 100);
+            setTimeout(() => showLoading(false), 300);
             
             // 位置情報は後からバックグラウンドで取得
             setTimeout(() => {
@@ -496,31 +505,39 @@
         
         // 高速登山道読み込み
         async function loadTrailsFast(lat, lon) {
-            const radius = 0.08; // 約9km
+            const radius = 0.065; // 約7km
             const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
             const server = servers[Math.floor(Math.random() * servers.length)];
             
             try {
                 const bbox = `${lat-radius},${lon-radius},${lat+radius},${lon+radius}`;
-                // 登山道のみ: sac_scale(登山グレード)があるpath、または林道track
-                const query = `[out:json][timeout:15];(way["highway"="path"]["sac_scale"](${bbox});way["highway"="track"]["tracktype"~"grade3|grade4|grade5"](${bbox});way["highway"="path"]["trail_visibility"](${bbox}););out body;>;out skel qt;`;
+                // シンプルなクエリ: pathとtrack
+                const query = `[out:json][timeout:15];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out body;>;out skel qt;`;
                 
-                showLoading(true, 'サーバーに接続中...', 50);
+                console.log('Loading trails from:', server);
+                showLoading(true, 'サーバーに接続中...', 55);
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 12000);
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
                 
-                const res = await fetch(`${server}?data=${encodeURIComponent(query)}`, { signal: controller.signal });
+                const res = await fetch(server, {
+                    method: 'POST',
+                    body: 'data=' + encodeURIComponent(query),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    signal: controller.signal
+                });
                 clearTimeout(timeoutId);
                 
-                if (!res.ok) throw new Error('Server error');
+                if (!res.ok) throw new Error('Server error: ' + res.status);
                 
                 showLoading(true, 'データを処理中...', 70);
                 const data = await res.json();
+                console.log('Trail data received:', data.elements?.length || 0, 'elements');
                 
                 const nodes = new Map();
                 data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
                 const ways = data.elements.filter(e => e.type === 'way');
                 
+                console.log('Ways to draw:', ways.length);
                 showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
                 
                 ways.forEach(way => {
@@ -538,10 +555,12 @@
                     }
                 });
                 
+                viewer.scene.requestRender();
                 if (ways.length > 0) showToast(`登山道 ${ways.length}本`);
+                else showToast('登山道なし');
             } catch(e) {
                 console.error('Trail load error:', e);
-                // エラーでも続行、トーストは出さない
+                showToast('登山道読み込み失敗');
             }
         }
         

@@ -531,22 +531,21 @@
             prev.forEach(e => viewer.entities.remove(e)); 
             const lines = []; 
             
-            // pumpSegmentsに対応するインデックスを計算
-            // セグメント0: 0 → relay[0].index (または最後まで)
-            // セグメント1: relay[0].index → relay[1].index (または最後まで)
-            // ...
-            const numSegments = pumpSegments.length;
-            
-            for (let p = 0; p < numSegments; p++) { 
+            // 全セグメントを1本のポリラインで描画（複数エンティティの問題を回避）
+            for (let p = 0; p < pumpSegments.length; p++) { 
                 const seg = pumpSegments[p]; 
                 let startIdx, endIdx;
                 
                 if (p === 0) {
                     startIdx = 0;
-                    endIdx = relays.length > 0 ? relays[0].index : interpolated.length - 1;
                 } else {
                     startIdx = relays[p - 1].index;
-                    endIdx = p < relays.length ? relays[p].index : interpolated.length - 1;
+                }
+                
+                if (p < relays.length) {
+                    endIdx = relays[p].index;
+                } else {
+                    endIdx = interpolated.length - 1;
                 }
                 
                 const color = seg.remainingPressure >= 0.4 ? Cesium.Color.LIMEGREEN : seg.remainingPressure >= 0.2 ? Cesium.Color.YELLOW : Cesium.Color.RED; 
@@ -557,10 +556,19 @@
                     }
                 }
                 if (positions.length >= 2) {
-                    lines.push(viewer.entities.add({ id: lineId, polyline: { positions, width: 5, material: color.withAlpha(0.85), clampToGround: true } })); 
+                    const entity = viewer.entities.add({ 
+                        polyline: { 
+                            positions: positions, 
+                            width: 5, 
+                            material: color.withAlpha(0.85), 
+                            clampToGround: true 
+                        } 
+                    }); 
+                    lines.push(entity);
                 }
             } 
             hoseSimState.colorizedLinesByLine.set(lineId, lines); 
+            viewer.scene.requestRender();
         }
         function interpolatePath(points, interval) { const result = []; let cumulative = 0; result.push({ ...points[0], distFromStart: 0 }); for (let i = 1; i < points.length; i++) { const p1 = points[i - 1], p2 = points[i]; const segDist = geodesicDistance(p1.lon, p1.lat, p2.lon, p2.lat); const segElev = (p2.height || 0) - (p1.height || 0); const steps = Math.ceil(segDist / interval); for (let s = 1; s <= steps; s++) { const t = s / steps; cumulative += segDist / steps; result.push({ lon: p1.lon + (p2.lon - p1.lon) * t, lat: p1.lat + (p2.lat - p1.lat) * t, height: (p1.height || 0) + segElev * t, distFromStart: cumulative }); } } return result; }
         function calcLossForDistance(dist, dh, params) { const hoses = dist / params.hoseLengthM; const frictionLoss = hoses * params.lossPerHoseMPa; const elevLoss = dh > 0 ? dh * 0.01 : dh * 0.01 / 3; return frictionLoss + elevLoss; }

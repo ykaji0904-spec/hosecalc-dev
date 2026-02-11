@@ -436,43 +436,90 @@
         
         // 初期化関数
         async function initializeApp() {
-            showLoading(true, '地図を初期化中...', 10);
+            showLoading(true, '地図を初期化中...', 20);
             
-            // 位置情報取得を試行
-            let initialLat = 34.3853, initialLon = 132.4553; // デフォルト: 広島
+            // デフォルト位置: 広島市中心部
+            const initialLat = 34.3853, initialLon = 132.4553;
             
-            try {
-                showLoading(true, '位置情報を取得中...', 20);
-                const position = await new Promise((resolve, reject) => {
-                    if (!navigator.geolocation) reject('非対応');
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-                });
-                initialLat = position.coords.latitude;
-                initialLon = position.coords.longitude;
-                myLocationCoords = { lat: initialLat, lon: initialLon };
-                document.getElementById('myLocationText').textContent = `${initialLat.toFixed(5)}, ${initialLon.toFixed(5)}`;
-                
-                if (myLocationEntity) viewer.entities.remove(myLocationEntity); 
-                myLocationEntity = viewer.entities.add({ 
-                    position: Cesium.Cartesian3.fromDegrees(initialLon, initialLat), 
-                    billboard: { image: createMyLocationIcon(), width: 24, height: 24, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } 
-                });
-            } catch(e) {
-                document.getElementById('myLocationText').textContent = '取得失敗';
-            }
+            // カメラを即座に設定
+            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 5000) });
             
-            showLoading(true, 'カメラを移動中...', 40);
-            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 3000) });
-            
-            // 登山道を読み込み
-            showLoading(true, '登山道データを読み込み中...', 60);
+            showLoading(true, '登山道を読み込み中...', 40);
             layers.trails = true;
             document.getElementById('trailToggle').classList.add('active');
             
-            await loadTrailsForArea(initialLat, initialLon);
+            // 登山道を非同期で読み込み（UIをブロックしない）
+            await loadTrailsFast(initialLat, initialLon);
             
-            showLoading(true, '完了', 100);
-            setTimeout(() => showLoading(false), 500);
+            showLoading(true, '完了！', 100);
+            setTimeout(() => showLoading(false), 300);
+            
+            // 位置情報は後からバックグラウンドで取得
+            setTimeout(() => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                        myLocationCoords = { lat, lon };
+                        document.getElementById('myLocationText').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                        if (myLocationEntity) viewer.entities.remove(myLocationEntity);
+                        myLocationEntity = viewer.entities.add({ 
+                            position: Cesium.Cartesian3.fromDegrees(lon, lat), 
+                            billboard: { image: createMyLocationIcon(), width: 24, height: 24, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } 
+                        });
+                    }, () => { document.getElementById('myLocationText').textContent = '取得失敗'; }, { timeout: 10000 });
+                }
+            }, 1000);
+        }
+        
+        // 高速登山道読み込み（より広範囲、軽量クエリ）
+        async function loadTrailsFast(lat, lon) {
+            const radius = 0.09; // 約10km
+            const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+            const server = servers[Math.floor(Math.random() * servers.length)];
+            
+            try {
+                const bbox = `${lat-radius},${lon-radius},${lat+radius},${lon+radius}`;
+                // 軽量クエリ: pathとtrackのみ（footwayは都市部に多く重い）
+                const query = `[out:json][timeout:15];way["highway"~"path|track"](${bbox});out body;>;out skel qt;`;
+                
+                showLoading(true, 'サーバーに接続中...', 50);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 12000);
+                
+                const res = await fetch(`${server}?data=${encodeURIComponent(query)}`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                showLoading(true, 'データを処理中...', 70);
+                const data = await res.json();
+                
+                const nodes = new Map();
+                data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
+                const ways = data.elements.filter(e => e.type === 'way');
+                
+                showLoading(true, `登山道 ${ways.length}本を描画中...`, 80);
+                
+                // 一括で追加（バッチ処理なし）
+                ways.forEach(way => {
+                    const pos = way.nodes.filter(nid => nodes.has(nid)).map(nid => {
+                        const n = nodes.get(nid);
+                        return Cesium.Cartesian3.fromDegrees(n[0], n[1]);
+                    });
+                    if (pos.length >= 2) {
+                        const e = viewer.entities.add({
+                            polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true }
+                        });
+                        e.show = layers.trails;
+                        e.osmId = way.id;
+                        trailEntities.push(e);
+                    }
+                });
+                
+                if (ways.length > 0) showToast(`登山道 ${ways.length}本を読み込みました`);
+                
+            } catch(e) {
+                console.error('Trail load error:', e);
+                showToast('登山道の読み込みをスキップしました');
+            }
         }
         
         // アプリ初期化実行

@@ -372,7 +372,7 @@
             if (trailLoadActive) return; 
             const c = viewer.camera.positionCartographic;
             const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
-            const radius = 0.05; // 約5.5km（軽量化）
+            const radius = 0.0675; // 約7.5km
             trailLoadActive = true; 
             showLoading(true, '登山道を読み込み中...', 30); 
             
@@ -475,32 +475,124 @@
         
         // 初期化関数
         async function initializeApp() {
-            // ローディング画面を即座に非表示
-            showLoading(false);
+            console.log('initializeApp started');
+            showLoading(true, '地図を読み込み中...', 10);
             
             // デフォルト位置: 広島市中心部
-            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(132.4553, 34.3853, 5000) });
+            const initialLat = 34.3853, initialLon = 132.4553;
             
-            // 位置情報をバックグラウンドで取得
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    const lat = pos.coords.latitude, lon = pos.coords.longitude;
-                    myLocationCoords = { lat, lon };
-                    document.getElementById('myLocationText').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-                    if (myLocationEntity) viewer.entities.remove(myLocationEntity);
-                    myLocationEntity = viewer.entities.add({ 
-                        position: Cesium.Cartesian3.fromDegrees(lon, lat), 
-                        billboard: { image: createMyLocationIcon(), width: 24, height: 24, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } 
-                    });
-                }, () => { document.getElementById('myLocationText').textContent = '取得失敗'; }, { timeout: 10000 });
-            }
+            // カメラを設定
+            viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(initialLon, initialLat, 5000) });
             
-            // 5秒後に登山道を自動読み込み
+            // Cesiumの地形タイル読み込み完了を待つ
+            await new Promise(resolve => {
+                let checkCount = 0;
+                const maxChecks = 50; // 最大5秒
+                
+                const checkTiles = () => {
+                    checkCount++;
+                    const tilesLoading = viewer.scene.globe.tilesLoaded;
+                    showLoading(true, '地形データを読み込み中...', 10 + Math.min(checkCount * 2, 40));
+                    
+                    if (tilesLoading || checkCount >= maxChecks) {
+                        console.log('Tiles loaded or timeout, count:', checkCount);
+                        resolve();
+                    } else {
+                        setTimeout(checkTiles, 100);
+                    }
+                };
+                
+                // 少し待ってからチェック開始
+                setTimeout(checkTiles, 500);
+            });
+            
+            console.log('Cesium ready, loading trails...');
+            showLoading(true, '登山道を読み込み中...', 50);
+            layers.trails = true;
+            document.getElementById('trailToggle').classList.add('active');
+            
+            // 登山道を読み込み
+            await loadTrailsFast(initialLat, initialLon);
+            
+            showLoading(true, '完了！', 100);
+            setTimeout(() => showLoading(false), 300);
+            
+            // 位置情報は後からバックグラウンドで取得
             setTimeout(() => {
-                layers.trails = true;
-                document.getElementById('trailToggle').classList.add('active');
-                loadTrails();
-            }, 5000);
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                        myLocationCoords = { lat, lon };
+                        document.getElementById('myLocationText').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                        if (myLocationEntity) viewer.entities.remove(myLocationEntity);
+                        myLocationEntity = viewer.entities.add({ 
+                            position: Cesium.Cartesian3.fromDegrees(lon, lat), 
+                            billboard: { image: createMyLocationIcon(), width: 24, height: 24, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } 
+                        });
+                    }, () => { document.getElementById('myLocationText').textContent = '取得失敗'; }, { timeout: 10000 });
+                }
+            }, 1000);
+        }
+        
+        // 高速登山道読み込み
+        async function loadTrailsFast(lat, lon) {
+            const radius = 0.065; // 約7km
+            const servers = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+            const server = servers[Math.floor(Math.random() * servers.length)];
+            
+            try {
+                const bbox = `${lat-radius},${lon-radius},${lat+radius},${lon+radius}`;
+                // シンプルなクエリ: pathとtrack
+                const query = `[out:json][timeout:15];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out body;>;out skel qt;`;
+                
+                console.log('Loading trails from:', server);
+                showLoading(true, 'サーバーに接続中...', 55);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                
+                const res = await fetch(server, {
+                    method: 'POST',
+                    body: 'data=' + encodeURIComponent(query),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) throw new Error('Server error: ' + res.status);
+                
+                showLoading(true, 'データを処理中...', 70);
+                const data = await res.json();
+                console.log('Trail data received:', data.elements?.length || 0, 'elements');
+                
+                const nodes = new Map();
+                data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
+                const ways = data.elements.filter(e => e.type === 'way');
+                
+                console.log('Ways to draw:', ways.length);
+                showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
+                
+                ways.forEach(way => {
+                    const pos = way.nodes.filter(nid => nodes.has(nid)).map(nid => {
+                        const n = nodes.get(nid);
+                        return Cesium.Cartesian3.fromDegrees(n[0], n[1]);
+                    });
+                    if (pos.length >= 2) {
+                        const e = viewer.entities.add({
+                            polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true }
+                        });
+                        e.show = layers.trails;
+                        e.osmId = way.id;
+                        trailEntities.push(e);
+                    }
+                });
+                
+                viewer.scene.requestRender();
+                if (ways.length > 0) showToast(`登山道 ${ways.length}本`);
+                else showToast('登山道なし');
+            } catch(e) {
+                console.error('Trail load error:', e);
+                showToast('登山道読み込み失敗');
+            }
         }
         
         // アプリ初期化実行

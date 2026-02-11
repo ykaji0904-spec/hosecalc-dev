@@ -413,6 +413,116 @@
         function createWaterIcon(type) { const c = document.createElement('canvas'); c.width = 28; c.height = 28; const ctx = c.getContext('2d'); ctx.beginPath(); ctx.arc(14, 14, 12, 0, Math.PI * 2); ctx.fillStyle = '#2196f3'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💧', 14, 14); return c.toDataURL(); }
         function selectWater(id) { const w = waterSources.find(s => s.id === id); if (!w) return; closeAllPanels(); selectedWater = w; document.getElementById('waterType').textContent = w.type === 'hydrant' ? '消火栓' : '水利'; document.getElementById('waterLat').textContent = w.lat.toFixed(6) + '°'; document.getElementById('waterLon').textContent = w.lon.toFixed(6) + '°'; document.getElementById('waterPanel').classList.add('active'); }
         function deleteSelectedWater() { if (!selectedWater) return; const idx = waterSources.findIndex(s => s.id === selectedWater.id); if (idx >= 0) { waterSources.splice(idx, 1); viewer.entities.remove(waterEntities[idx]); waterEntities.splice(idx, 1); } document.getElementById('waterPanel').classList.remove('active'); selectedWater = null; }
+
+        // ホース延長
+        let hosePoints = [], hoseMarkers = [], hoseLine = null, confirmedLines = [], selectedHoseLine = null;
+        const hoseSimState = { markersByLineId: new Map(), relayMarkersByLine: new Map(), colorizedLinesByLine: new Map(), startEndMarkersByLine: new Map() };
+        const hoseParams = { pumpOutputMPa: 1.2, relayOutputMPa: 0.8, minInletPressureMPa: 0.2, nozzleRequiredMPa: 0.4, lossPerHoseMPa: 0.02, hoseLengthM: 20 };
+        
+        function addHosePoint(lon, lat, height, cartesian) { 
+            hosePoints.push({ lon, lat, height, cartesian }); 
+            const m = viewer.entities.add({ position: cartesian, point: { pixelSize: 8, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 1, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } }); 
+            hoseMarkers.push(m); 
+            updateHoseLine(); 
+            updateHosePanel(); 
+            viewer.scene.requestRender();
+        }
+        function updateHoseLine() { 
+            if (hoseLine) viewer.entities.remove(hoseLine); 
+            if (hosePoints.length >= 2) { 
+                hoseLine = viewer.entities.add({ polyline: { positions: hosePoints.map(p => p.cartesian), width: 4, material: Cesium.Color.ORANGE.withAlpha(0.9), clampToGround: true } }); 
+            } 
+        }
+        function updateHosePanel() { 
+            if (hosePoints.length < 2) { 
+                document.getElementById('hoseTotalDist').textContent = '0m'; 
+                document.getElementById('hoseTotalCount').textContent = '0本'; 
+                document.getElementById('hoseElevInfo').textContent = '-'; 
+                return; 
+            } 
+            let totalDist = 0; 
+            for (let i = 1; i < hosePoints.length; i++) { 
+                totalDist += geodesicDistance(hosePoints[i - 1].lon, hosePoints[i - 1].lat, hosePoints[i].lon, hosePoints[i].lat); 
+            } 
+            const totalHose = Math.ceil(totalDist / 20); 
+            const elevDiff = hosePoints[hosePoints.length - 1].height - hosePoints[0].height; 
+            document.getElementById('hoseTotalDist').textContent = formatDistance(totalDist); 
+            document.getElementById('hoseTotalCount').textContent = totalHose + '本'; 
+            document.getElementById('hoseElevInfo').textContent = (elevDiff >= 0 ? '+' : '') + elevDiff.toFixed(0) + 'm'; 
+        }
+        function undoHosePoint() { 
+            if (hosePoints.length === 0) return; 
+            hosePoints.pop(); 
+            if (hoseMarkers.length > 0) viewer.entities.remove(hoseMarkers.pop()); 
+            updateHoseLine(); 
+            updateHosePanel(); 
+            viewer.scene.requestRender();
+        }
+        function resetHoseLine() { 
+            hosePoints = []; 
+            hoseMarkers.forEach(m => viewer.entities.remove(m)); 
+            hoseMarkers = []; 
+            if (hoseLine) { viewer.entities.remove(hoseLine); hoseLine = null; } 
+            updateHosePanel(); 
+            document.getElementById('hoseHint').textContent = '連続タップでポイント追加'; 
+        }
+        function closeHosePanel() { 
+            document.getElementById('hosePanel').classList.remove('active'); 
+            resetHoseLine(); 
+            clearTool(); 
+        }
+        function confirmHoseLine() { 
+            if (hosePoints.length < 2) { showToast('2点以上必要です'); return; } 
+            const lineId = 'hose-' + Date.now(); 
+            const pathLLH = hosePoints.map(p => ({ lon: p.lon, lat: p.lat, height: p.height })); 
+            confirmedLines.push({ id: lineId, points: [...hosePoints] }); 
+            if (hoseLine) viewer.entities.remove(hoseLine); 
+            hoseLine = null; 
+            hoseMarkers.forEach(m => viewer.entities.remove(m)); 
+            hoseMarkers = []; 
+            runSimulationForLine(lineId, pathLLH); 
+            hosePoints = []; 
+            document.getElementById('hosePanel').classList.remove('active'); 
+            document.getElementById('hoseInfoPanel').classList.add('active');
+            clearTool();
+            viewer.scene.requestRender();
+            showToast('シミュレーション完了');
+        }
+        function selectHoseLine(id) { 
+            const line = confirmedLines.find(l => l.id === id); 
+            if (!line) return; 
+            closeAllPanels(); 
+            selectedHoseLine = id; 
+            const pathLLH = line.points.map(p => ({ lon: p.lon, lat: p.lat, height: p.height })); 
+            runSimulationForLine(id, pathLLH); 
+            document.getElementById('hoseInfoPanel').classList.add('active'); 
+        }
+        function deleteSelectedHose() { 
+            if (!selectedHoseLine) return; 
+            const idx = confirmedLines.findIndex(l => l.id === selectedHoseLine); 
+            if (idx >= 0) confirmedLines.splice(idx, 1); 
+            clearSimulationVisuals(selectedHoseLine); 
+            document.getElementById('hoseInfoPanel').classList.remove('active'); 
+            selectedHoseLine = null; 
+            viewer.scene.requestRender();
+        }
+        function clearSimulationVisuals(lineId) { 
+            (hoseSimState.markersByLineId.get(lineId) || []).forEach(e => viewer.entities.remove(e)); 
+            hoseSimState.markersByLineId.delete(lineId); 
+            (hoseSimState.relayMarkersByLine.get(lineId) || []).forEach(e => viewer.entities.remove(e)); 
+            hoseSimState.relayMarkersByLine.delete(lineId); 
+            (hoseSimState.colorizedLinesByLine.get(lineId) || []).forEach(e => viewer.entities.remove(e)); 
+            hoseSimState.colorizedLinesByLine.delete(lineId); 
+            (hoseSimState.startEndMarkersByLine.get(lineId) || []).forEach(e => viewer.entities.remove(e)); 
+            hoseSimState.startEndMarkersByLine.delete(lineId); 
+        }
+        function onParamChange() { 
+            if (selectedHoseLine) { 
+                const line = confirmedLines.find(l => l.id === selectedHoseLine); 
+                if (line) runSimulationForLine(selectedHoseLine, line.points.map(p => ({ lon: p.lon, lat: p.lat, height: p.height }))); 
+            } 
+        }
+
         function updateHoseInfoPanel(data) { document.getElementById('hoseInfoDist').textContent = formatDistance(data.totalLengthM); document.getElementById('hoseInfoCount').textContent = data.totalHoses20m + '本'; const endPEl = document.getElementById('hoseInfoEndP'); endPEl.textContent = data.endPressureMPa.toFixed(2) + ' MPa'; endPEl.className = data.endPressureMPa >= hoseParams.nozzleRequiredMPa ? 'panel-stat-value ok' : data.endPressureMPa >= hoseParams.minInletPressureMPa ? 'panel-stat-value highlight' : 'panel-stat-value warning'; document.getElementById('hoseInfoRelay').textContent = (data.totalPumps - 1) + '台'; if (data.pumpSegments) { const tbody = document.getElementById('segmentTableBody'); let html = ''; for (const seg of data.pumpSegments) { const colorClass = seg.remainingPressure >= 0.4 ? 'green' : seg.remainingPressure >= 0.2 ? 'yellow' : 'red'; const elevClass = seg.elevation >= 0 ? 'elev-up' : 'elev-down'; const elevStr = seg.elevation >= 0 ? '+' + seg.elevation.toFixed(0) : seg.elevation.toFixed(0); html += '<tr class="' + colorClass + '"><td>' + seg.pumpLabel + '→' + seg.nextLabel + '</td><td>' + seg.distance.toFixed(0) + 'm</td><td>' + seg.hoses + '本</td><td class="' + elevClass + '">' + elevStr + 'm</td><td>' + seg.loss.toFixed(2) + '</td><td>' + seg.remainingPressure.toFixed(2) + '</td></tr>'; } tbody.innerHTML = html; } }
         function renderStartEndMarkers(lineId, pathLLH) { const prev = hoseSimState.startEndMarkersByLine.get(lineId) || []; prev.forEach(e => viewer.entities.remove(e)); const markers = []; if (pathLLH.length >= 1) { const start = pathLLH[0]; markers.push(viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(start.lon, start.lat, start.height || 0), point: { pixelSize: 14, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: '🚒', font: 'bold 12px sans-serif', fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) } })); } if (pathLLH.length >= 2) { const end = pathLLH[pathLLH.length - 1]; markers.push(viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(end.lon, end.lat, end.height || 0), point: { pixelSize: 12, color: Cesium.Color.BLUE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: '筒先', font: 'bold 11px sans-serif', fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) } })); } hoseSimState.startEndMarkersByLine.set(lineId, markers); }
         function renderRelayMarkersFromPositions(lineId, relays) { const prev = hoseSimState.relayMarkersByLine.get(lineId) || []; prev.forEach(e => viewer.entities.remove(e)); const markers = relays.map((r, i) => viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(r.lon, r.lat, r.height || 0), point: { pixelSize: 12, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }, label: { text: `P${i + 2}`, font: 'bold 11px sans-serif', fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) } })); hoseSimState.relayMarkersByLine.set(lineId, markers); }
@@ -421,7 +531,7 @@
         function calcLossForDistance(dist, dh, params) { const hoses = dist / params.hoseLengthM; const frictionLoss = hoses * params.lossPerHoseMPa; const elevLoss = dh > 0 ? dh * 0.01 : dh * 0.01 / 3; return frictionLoss + elevLoss; }
         function computeRelayPositionsInterpolated(interpolated, params) { const relays = []; let currentPressure = params.pumpOutputMPa; let lastRelayIdx = 0; for (let i = 1; i < interpolated.length; i++) { const dist = interpolated[i].distFromStart - interpolated[lastRelayIdx].distFromStart; const dh = interpolated[i].height - interpolated[lastRelayIdx].height; const loss = calcLossForDistance(dist, dh, params); const remain = currentPressure - loss; if (remain < params.minInletPressureMPa) { const relayIdx = i - 1 > lastRelayIdx ? i - 1 : i; relays.push({ index: relayIdx, lon: interpolated[relayIdx].lon, lat: interpolated[relayIdx].lat, height: interpolated[relayIdx].height }); lastRelayIdx = relayIdx; currentPressure = params.relayOutputMPa; } } return relays; }
         function computePumpSegmentsFromRelays(interpolated, relays, params) { const segments = []; const relayIndices = [0, ...relays.map(r => r.index)]; for (let p = 0; p < relayIndices.length; p++) { const startIdx = relayIndices[p]; const endIdx = p < relayIndices.length - 1 ? relayIndices[p + 1] : interpolated.length - 1; const dist = interpolated[endIdx].distFromStart - interpolated[startIdx].distFromStart; const dh = interpolated[endIdx].height - interpolated[startIdx].height; const hoses = Math.ceil(dist / params.hoseLengthM); const loss = calcLossForDistance(dist, dh, params); const outputP = p === 0 ? params.pumpOutputMPa : params.relayOutputMPa; const remain = outputP - loss; const pumpLabel = p === 0 ? '消防車' : `P${p + 1}`; const nextLabel = p < relayIndices.length - 1 ? `P${p + 2}` : '筒先'; segments.push({ pumpLabel, nextLabel, distance: dist, hoses, elevation: dh, loss, remainingPressure: remain }); } return segments; }
-        function runSimulationForLine(lineId, pathLLH) { hoseParams.pumpOutputMPa = parseFloat(document.getElementById('paramPumpOut').value) || 1.2; hoseParams.relayOutputMPa = parseFloat(document.getElementById('paramRelayOut').value) || 0.8; hoseParams.minInletPressureMPa = parseFloat(document.getElementById('paramInlet').value) || 0.2; hoseParams.nozzleRequiredMPa = parseFloat(document.getElementById('paramNozzle').value) || 0.4; hoseParams.lossPerHoseMPa = parseFloat(document.getElementById('paramLossPerHose').value) || 0.02; clearSimulationVisuals(lineId); const interpolated = interpolatePath(pathLLH, 10); const relays = computeRelayPositionsInterpolated(interpolated, hoseParams); const pumpSegments = computePumpSegmentsFromRelays(interpolated, relays, hoseParams); let totalDist = interpolated[interpolated.length - 1].distFromStart; const totalHoses = Math.ceil(totalDist / hoseParams.hoseLengthM); const endPressure = pumpSegments.length > 0 ? pumpSegments[pumpSegments.length - 1].remainingPressure : hoseParams.pumpOutputMPa; renderStartEndMarkers(lineId, pathLLH); renderRelayMarkersFromPositions(lineId, relays); renderColorizedByPumpSegments(lineId, interpolated, relays, pumpSegments); updateHoseInfoPanel({ totalLengthM: totalDist, totalHoses20m: totalHoses, endPressureMPa: endPressure, totalPumps: relays.length + 1, pumpSegments }); }
+        function runSimulationForLine(lineId, pathLLH) { hoseParams.pumpOutputMPa = parseFloat(document.getElementById('paramPumpOut').value) || 1.2; hoseParams.relayOutputMPa = parseFloat(document.getElementById('paramRelayOut').value) || 0.8; hoseParams.minInletPressureMPa = parseFloat(document.getElementById('paramInlet').value) || 0.2; hoseParams.nozzleRequiredMPa = parseFloat(document.getElementById('paramNozzle').value) || 0.4; hoseParams.lossPerHoseMPa = parseFloat(document.getElementById('paramLossPerHose').value) || 0.02; clearSimulationVisuals(lineId); const interpolated = interpolatePath(pathLLH, 10); const relays = computeRelayPositionsInterpolated(interpolated, hoseParams); const pumpSegments = computePumpSegmentsFromRelays(interpolated, relays, hoseParams); let totalDist = interpolated[interpolated.length - 1].distFromStart; const totalHoses = Math.ceil(totalDist / hoseParams.hoseLengthM); const endPressure = pumpSegments.length > 0 ? pumpSegments[pumpSegments.length - 1].remainingPressure : hoseParams.pumpOutputMPa; renderStartEndMarkers(lineId, pathLLH); renderRelayMarkersFromPositions(lineId, relays); renderColorizedByPumpSegments(lineId, interpolated, relays, pumpSegments); updateHoseInfoPanel({ totalLengthM: totalDist, totalHoses20m: totalHoses, endPressureMPa: endPressure, totalPumps: relays.length + 1, pumpSegments }); viewer.scene.requestRender(); }
 
         // 2点計測
         let measurePoints = [], measureMarkers = [], measureLine = null;

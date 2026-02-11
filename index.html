@@ -653,10 +653,25 @@
             if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } 
             const picked = viewer.scene.pick(click.position); 
             if (picked && picked.id) { 
-                const pickedId = typeof picked.id.id === 'string' ? picked.id.id : ''; 
+                // エンティティのIDを取得（文字列またはEntityオブジェクト）
+                let pickedId = '';
+                if (typeof picked.id === 'string') {
+                    pickedId = picked.id;
+                } else if (picked.id.id && typeof picked.id.id === 'string') {
+                    pickedId = picked.id.id;
+                }
+                
+                console.log('Picked ID:', pickedId);
+                
                 if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; } 
                 if (pickedId.startsWith('water-')) { selectWater(pickedId); return; } 
-                if (pickedId.startsWith('hose-')) { selectHoseLine(pickedId); return; } 
+                if (pickedId.startsWith('hose-')) { 
+                    // hose-XXXXX-seg-N の形式から hose-XXXXX を抽出
+                    const lineId = pickedId.split('-seg-')[0];
+                    console.log('Line ID:', lineId);
+                    selectHoseLine(lineId); 
+                    return; 
+                } 
             } 
             const ray = viewer.camera.getPickRay(click.position); 
             const cartesian = viewer.scene.globe.pick(ray, viewer.scene); 

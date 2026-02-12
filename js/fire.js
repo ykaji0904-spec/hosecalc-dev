@@ -2,6 +2,9 @@ import S from './state.js';
 import { closeAllPanels, showToast } from './ui.js';
 import { saveAllData } from './storage.js';
 
+const FIRE_AREA_ID = 'fire-area-polygon';
+const FIRE_BORDER_ID = 'fire-area-border';
+
 function createFireIcon() {
     const c = document.createElement('canvas'); c.width = 32; c.height = 32;
     const ctx = c.getContext('2d');
@@ -34,6 +37,85 @@ function createFireIcon() {
     return c.toDataURL();
 }
 
+// --- Convex Hull (Andrew's monotone chain) ---
+function convexHull(points) {
+    if (points.length < 3) return points.slice();
+    const pts = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lower = [];
+    for (const p of pts) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+        lower.push(p);
+    }
+    const upper = [];
+    for (let i = pts.length - 1; i >= 0; i--) {
+        const p = pts[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+        upper.push(p);
+    }
+    lower.pop(); upper.pop();
+    return lower.concat(upper);
+}
+
+// --- 延焼エリア表示更新 ---
+export function updateFireArea() {
+    // 既存を削除
+    const existing = S.viewer.entities.getById(FIRE_AREA_ID);
+    if (existing) S.viewer.entities.remove(existing);
+    const existingBorder = S.viewer.entities.getById(FIRE_BORDER_ID);
+    if (existingBorder) S.viewer.entities.remove(existingBorder);
+
+    if (S.firePoints.length < 3) {
+        S.viewer.scene.requestRender();
+        return;
+    }
+
+    // 凸包を計算
+    const pts = S.firePoints.map(p => [p.lon, p.lat]);
+    const hull = convexHull(pts);
+    if (hull.length < 3) return;
+
+    // 凸包をわずかに膨らませる（バッファ）
+    const cx = hull.reduce((s, p) => s + p[0], 0) / hull.length;
+    const cy = hull.reduce((s, p) => s + p[1], 0) / hull.length;
+    const buffered = hull.map(p => {
+        const dx = p[0] - cx, dy = p[1] - cy;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const expand = 0.0003; // 約30m程度の膨らみ
+        return [p[0] + (dx / len) * expand, p[1] + (dy / len) * expand];
+    });
+
+    const degreesFlat = [];
+    buffered.forEach(p => { degreesFlat.push(p[0], p[1]); });
+
+    // 半透明ポリゴン（地形にドレープ）
+    S.viewer.entities.add({
+        id: FIRE_AREA_ID,
+        polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray(degreesFlat),
+            material: Cesium.Color.fromCssColorString('#ff3300').withAlpha(0.18),
+            classificationType: Cesium.ClassificationType.TERRAIN
+        }
+    });
+
+    // 境界線（破線風の赤）
+    const borderDegrees = [...degreesFlat, degreesFlat[0], degreesFlat[1]];
+    S.viewer.entities.add({
+        id: FIRE_BORDER_ID,
+        polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray(borderDegrees),
+            width: 3,
+            material: new Cesium.PolylineDashMaterialProperty({
+                color: Cesium.Color.fromCssColorString('#ff3300').withAlpha(0.7),
+                dashLength: 12
+            }),
+            clampToGround: true
+        }
+    });
+
+    S.viewer.scene.requestRender();
+}
+
 export function addFirePoint(lon, lat, height) {
     const id = `fire-${++S.firePointIdCounter}`;
     S.firePoints.push({ id, lon, lat, height });
@@ -43,6 +125,7 @@ export function addFirePoint(lon, lat, height) {
     });
     S.firePointEntities.push(e);
     if (!S.isRestoring) saveAllData();
+    updateFireArea();
     // トレースガイド更新
     if (S.traceGuideActive) import('./trace.js').then(m => m.updateTraceGuide());
     return id;
@@ -84,4 +167,5 @@ export function deleteSelectedFire() {
     document.getElementById('firePanel').classList.remove('active');
     S.selectedFirePoint = null;
     saveAllData();
+    updateFireArea();
 }

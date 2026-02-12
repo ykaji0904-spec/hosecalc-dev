@@ -28,11 +28,25 @@ window.addEventListener('unhandledrejection', function(e) {
 function setOperation(op) {
     if (S.currentTool === op) { clearTool(); updateLayerCards(); return; }
     clearTool(); S.currentTool = op;
-    const ind = document.getElementById('modeIndicator'), icon = document.getElementById('modeIcon'), text = document.getElementById('modeText');
-    if (op === 'fire') { icon.textContent = 'local_fire_department'; text.textContent = '火点追加'; ind.className = 'mode-indicator show'; }
-    else if (op === 'water') { icon.textContent = 'water_drop'; text.textContent = '水利追加'; ind.className = 'mode-indicator show water-mode'; }
-    else if (op === 'hose') { icon.textContent = 'route'; text.textContent = 'ホース延長'; ind.className = 'mode-indicator show hose-mode'; document.getElementById('hosePanel').classList.add('active'); resetHoseLine(); }
-    else if (op === 'measure') { icon.textContent = 'straighten'; text.textContent = '2点計測'; ind.className = 'mode-indicator show measure-mode'; document.getElementById('measurePanel').classList.add('active'); resetMeasure(); }
+    const ind = document.getElementById('modeIndicator'), icon = document.getElementById('modeIcon'), text = document.getElementById('modeText'), hint = document.getElementById('modeHint');
+    if (op === 'fire') {
+        icon.textContent = 'local_fire_department'; text.textContent = '火点追加'; ind.className = 'mode-indicator show';
+        hint.textContent = '地図をタップして火災地点を登録';
+    }
+    else if (op === 'water') {
+        icon.textContent = 'water_drop'; text.textContent = '水利追加'; ind.className = 'mode-indicator show water-mode';
+        hint.textContent = '地図をタップして水利（消火栓・防火水槽など）を登録';
+    }
+    else if (op === 'hose') {
+        icon.textContent = 'route'; text.textContent = 'ホース延長'; ind.className = 'mode-indicator show hose-mode';
+        hint.textContent = '水利→火点の順に地図をタップしてホースルートを作成';
+        document.getElementById('hosePanel').classList.add('active'); resetHoseLine();
+    }
+    else if (op === 'measure') {
+        icon.textContent = 'straighten'; text.textContent = '2点計測'; ind.className = 'mode-indicator show measure-mode';
+        hint.textContent = '地図上の2点をタップして距離と高低差を計測';
+        document.getElementById('measurePanel').classList.add('active'); resetMeasure();
+    }
     updateLayerCards();
     closeSidePanel();
 }

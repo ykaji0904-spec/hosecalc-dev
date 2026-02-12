@@ -26,14 +26,19 @@ function showStepBanner(icon, message, actionLabel, actionFn) {
 function activateTool(tool, iconName, label, modeClass, hintText) {
     clearTool();
     S.currentTool = tool;
+    // トレースガイド中はモードインジケーター非表示（バナーだけで誘導）
     const ind = document.getElementById('modeIndicator');
     const ic = document.getElementById('modeIcon');
     const tx = document.getElementById('modeText');
     const ht = document.getElementById('modeHint');
-    ic.textContent = iconName;
-    tx.textContent = label;
-    if (ht) ht.textContent = hintText || '';
-    ind.className = 'mode-indicator show ' + modeClass;
+    if (S.traceGuideActive) {
+        ind.className = 'mode-indicator';
+    } else {
+        ic.textContent = iconName;
+        tx.textContent = label;
+        if (ht) ht.textContent = hintText || '';
+        ind.className = 'mode-indicator show ' + modeClass;
+    }
     updateLayerCards();
 }
 

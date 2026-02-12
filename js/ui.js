@@ -123,7 +123,7 @@ export function copyMarkerCoords() {
 const INFO_CONTENT = {
     about: {
         title: 'HoseCalcについて',
-        html: '<h3>概要</h3><p>林野火災などの際にホース延長シミュレーションを行うプラットフォームです。</p><h3>主な機能</h3><p>・リアルな地形データを使ったホース延長シミュレーション<br>・圧力損失と中継ポンプ位置の自動計算<br>・火点・水利ポイントの登録と管理<br>・洪水・津波・土砂災害ハザードマップの重畳表示<br>・登山道の表示</p><h3>対象ユーザー</h3><p>消防職員・消防団員・その他防災関係者</p><p style="color:rgba(255,255,255,0.4);margin-top:16px">開発: Y.K.</p>'
+        html: '<h3>概要</h3><p>林野火災などの際にホース延長シミュレーションを行うプラットフォームです。</p><h3>主な機能</h3><p>・リアルな地形データを使ったホース延長シミュレーション<br>・圧力損失と中継ポンプ位置の自動計算<br>・火点・水利ポイントの登録と管理<br>・洪水・津波・土砂災害ハザードマップの重畳表示<br>・登山道・一般道路の表示とルートトレース</p><h3>対象ユーザー</h3><p>消防職員・消防団員・その他防災関係者</p><p style="color:rgba(255,255,255,0.4);margin-top:16px">開発: Y.K.</p>'
     },
     usage: {
         title: '使い方',
@@ -135,7 +135,7 @@ const INFO_CONTENT = {
     },
     source: {
         title: 'データソース',
-        html: '<div class="param-row"><span class="param-label">衛星画像</span><span class="param-value">Cesium Ion</span></div><div class="param-row"><span class="param-label">地形</span><span class="param-value">Cesium World Terrain</span></div><div class="param-row"><span class="param-label">標準地図</span><span class="param-value">国土地理院</span></div><div class="param-row"><span class="param-label">登山道</span><span class="param-value">OpenStreetMap</span></div><div class="param-row"><span class="param-label">ハザードマップ</span><span class="param-value">国土交通省</span></div>'
+        html: '<div class="param-row"><span class="param-label">衛星画像</span><span class="param-value">Cesium Ion</span></div><div class="param-row"><span class="param-label">地形</span><span class="param-value">Cesium World Terrain</span></div><div class="param-row"><span class="param-label">標準地図</span><span class="param-value">国土地理院</span></div><div class="param-row"><span class="param-label">道路データ</span><span class="param-value">OpenStreetMap</span></div><div class="param-row"><span class="param-label">ハザードマップ</span><span class="param-value">国土交通省</span></div>'
     }
 };
 

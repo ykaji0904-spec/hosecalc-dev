@@ -22,6 +22,8 @@ export function addFirePoint(lon, lat, height) {
     });
     S.firePointEntities.push(e);
     if (!S.isRestoring) saveAllData();
+    // トレースガイド更新
+    if (S.traceGuideActive) import('./trace.js').then(m => m.updateTraceGuide());
     return id;
 }
 

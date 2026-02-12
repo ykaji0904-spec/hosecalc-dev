@@ -30,6 +30,13 @@ export function addFirePoint(lon, lat, height) {
 export function selectFirePoint(id) {
     const f = S.firePoints.find(p => p.id === id);
     if (!f) return;
+
+    // トレースガイド中：既存火点の選択
+    if (S.traceGuideActive && S.traceGuideStep === 'fire') {
+        import('./trace.js').then(m => m.traceSelectFire(f));
+        return;
+    }
+
     closeAllPanels();
     S.selectedFirePoint = f;
     document.getElementById('fireLat').textContent = f.lat.toFixed(6) + '°';

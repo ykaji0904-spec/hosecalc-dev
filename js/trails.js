@@ -2,6 +2,25 @@ import S from './state.js';
 import { OVERPASS_SERVERS, TRAIL_RADIUS } from './config.js';
 import { showLoading, showToast } from './ui.js';
 
+// グラフ構造: trailGraph.nodes = Map<nodeId, {lon, lat}>
+//             trailGraph.edges = Map<nodeId, [{to, dist}]>
+export const trailGraph = { nodes: new Map(), edges: new Map() };
+
+function haversineDistance(lon1, lat1, lon2, lat2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function addEdge(from, to, dist) {
+    if (!trailGraph.edges.has(from)) trailGraph.edges.set(from, []);
+    if (!trailGraph.edges.has(to)) trailGraph.edges.set(to, []);
+    trailGraph.edges.get(from).push({ to, dist });
+    trailGraph.edges.get(to).push({ to: from, dist }); // 双方向
+}
+
 export async function loadTrails() {
     if (S.trailLoadActive) return;
     const c = S.viewer.camera.positionCartographic;
@@ -35,6 +54,32 @@ export async function loadTrails() {
             data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
             const ways = data.elements.filter(e => e.type === 'way');
 
+            // グラフ構築
+            let newNodes = 0, newEdges = 0;
+            ways.forEach(way => {
+                const wayNodes = way.nodes.filter(nid => nodes.has(nid));
+                for (let i = 0; i < wayNodes.length; i++) {
+                    const nid = wayNodes[i];
+                    if (!trailGraph.nodes.has(nid)) {
+                        const [lon, lat] = nodes.get(nid);
+                        trailGraph.nodes.set(nid, { lon, lat });
+                        newNodes++;
+                    }
+                    if (i > 0) {
+                        const prev = wayNodes[i - 1];
+                        const [lon1, lat1] = nodes.get(prev);
+                        const [lon2, lat2] = nodes.get(nid);
+                        // 重複エッジ回避
+                        const existing = trailGraph.edges.get(prev);
+                        if (!existing || !existing.some(e => e.to === nid)) {
+                            const dist = haversineDistance(lon1, lat1, lon2, lat2);
+                            addEdge(prev, nid, dist);
+                            newEdges++;
+                        }
+                    }
+                }
+            });
+
             showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
             ways.forEach(way => {
                 if (S.trailEntities.some(e => e.osmId === way.id)) return;
@@ -48,7 +93,8 @@ export async function loadTrails() {
 
             S.viewer.scene.requestRender();
             showLoading(true, '完了', 100);
-            if (ways.length > 0) showToast(`登山道 ${ways.length}本`);
+            console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges`);
+            if (ways.length > 0) showToast(`登山道 ${ways.length}本（${trailGraph.nodes.size}ノード）`);
             else showToast('この範囲に登山道データがありません');
             success = true;
         } catch (e) { console.log('Trail server failed:', server, e.message); }
@@ -57,4 +103,63 @@ export async function loadTrails() {
     if (!success) showToast('登山道の読み込みに失敗（後で再試行してください）');
     S.trailLoadActive = false;
     setTimeout(() => showLoading(false), 300);
+}
+
+// 最寄りのグラフノードを探す
+export function findNearestNode(lon, lat, maxDistM = 500) {
+    let bestId = null, bestDist = Infinity;
+    for (const [id, node] of trailGraph.nodes) {
+        const d = haversineDistance(lon, lat, node.lon, node.lat);
+        if (d < bestDist) { bestDist = d; bestId = id; }
+    }
+    if (bestDist > maxDistM) return null;
+    return { id: bestId, dist: bestDist };
+}
+
+// ダイクストラ最短経路
+export function dijkstra(startId, endId) {
+    if (!trailGraph.edges.has(startId) || !trailGraph.edges.has(endId)) return null;
+
+    const dist = new Map();
+    const prev = new Map();
+    const visited = new Set();
+    // 簡易優先キュー（小規模グラフなので十分）
+    const queue = [];
+
+    dist.set(startId, 0);
+    queue.push({ id: startId, d: 0 });
+
+    while (queue.length > 0) {
+        // 最小距離のノードを取得
+        queue.sort((a, b) => a.d - b.d);
+        const { id: current } = queue.shift();
+
+        if (visited.has(current)) continue;
+        visited.add(current);
+
+        if (current === endId) break;
+
+        const edges = trailGraph.edges.get(current) || [];
+        for (const edge of edges) {
+            if (visited.has(edge.to)) continue;
+            const newDist = dist.get(current) + edge.dist;
+            if (!dist.has(edge.to) || newDist < dist.get(edge.to)) {
+                dist.set(edge.to, newDist);
+                prev.set(edge.to, current);
+                queue.push({ id: edge.to, d: newDist });
+            }
+        }
+    }
+
+    if (!prev.has(endId) && startId !== endId) return null;
+
+    // パス復元
+    const path = [];
+    let current = endId;
+    while (current !== undefined) {
+        const node = trailGraph.nodes.get(current);
+        if (node) path.unshift({ lon: node.lon, lat: node.lat });
+        current = prev.get(current);
+    }
+    return path.length >= 2 ? { path, totalDist: dist.get(endId) || 0 } : null;
 }

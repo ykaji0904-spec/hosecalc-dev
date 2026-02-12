@@ -667,19 +667,19 @@ var HoseCalc = (() => {
       showStepBanner("hiking", "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
       return;
     }
-    if (!hasWater) {
-      activateTool("water", "water_drop", "\u6C34\u5229\u8FFD\u52A0", "water-mode", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u6E90\u3092\u767B\u9332");
-      showStepBanner("water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
-      return;
-    }
     if (!hasFire) {
       activateTool("fire", "local_fire_department", "\u706B\u70B9\u8FFD\u52A0", "", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u706B\u70B9\u3092\u767B\u9332");
       showStepBanner("local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
       return;
     }
+    if (!hasWater) {
+      activateTool("water", "water_drop", "\u6C34\u5229\u8FFD\u52A0", "water-mode", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u6E90\u3092\u767B\u9332");
+      showStepBanner("water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
+      return;
+    }
     state_default.traceGuideActive = false;
     clearTool();
-    showStepBanner("route", "\u6E96\u5099\u5B8C\u4E86", "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", "_execTrace()");
+    showStepBanner("route", "\u6E96\u5099\u5B8C\u4E86", "\u25B6 \u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", "_execTrace()");
   }
   async function traceTrailRoute() {
     closeSidePanel();
@@ -688,19 +688,19 @@ var HoseCalc = (() => {
     const hasWater = state_default.waterSources.length > 0;
     const hasFire = state_default.firePoints.length > 0;
     if (hasTrails && hasWater && hasFire) {
-      showStepBanner("route", "\u6E96\u5099\u5B8C\u4E86", "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", "_execTrace()");
+      showStepBanner("route", "\u6E96\u5099\u5B8C\u4E86", "\u25B6 \u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", "_execTrace()");
       return;
     }
     state_default.traceGuideActive = true;
     if (!hasTrails) {
       if (!state_default.layers.trails) toggleMapLayer("trails");
       showStepBanner("hiking", "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
-    } else if (!hasWater) {
-      activateTool("water", "water_drop", "\u6C34\u5229\u8FFD\u52A0", "water-mode", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u6E90\u3092\u767B\u9332");
-      showStepBanner("water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
-    } else {
+    } else if (!hasFire) {
       activateTool("fire", "local_fire_department", "\u706B\u70B9\u8FFD\u52A0", "", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u706B\u70B9\u3092\u767B\u9332");
       showStepBanner("local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
+    } else {
+      activateTool("water", "water_drop", "\u6C34\u5229\u8FFD\u52A0", "water-mode", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u6E90\u3092\u767B\u9332");
+      showStepBanner("water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
     }
   }
   async function execTrace() {

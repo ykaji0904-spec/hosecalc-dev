@@ -1281,6 +1281,8 @@ var HoseCalc = (() => {
   init_state();
   init_ui();
   init_storage();
+  var FIRE_AREA_ID = "fire-area-polygon";
+  var FIRE_BORDER_ID = "fire-area-border";
   function createFireIcon() {
     const c = document.createElement("canvas");
     c.width = 32;
@@ -1314,6 +1316,72 @@ var HoseCalc = (() => {
     ctx.fill();
     return c.toDataURL();
   }
+  function convexHull(points) {
+    if (points.length < 3) return points.slice();
+    const pts = points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lower = [];
+    for (const p of pts) {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+      lower.push(p);
+    }
+    const upper = [];
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+      upper.push(p);
+    }
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
+  }
+  function updateFireArea() {
+    const existing = state_default.viewer.entities.getById(FIRE_AREA_ID);
+    if (existing) state_default.viewer.entities.remove(existing);
+    const existingBorder = state_default.viewer.entities.getById(FIRE_BORDER_ID);
+    if (existingBorder) state_default.viewer.entities.remove(existingBorder);
+    if (state_default.firePoints.length < 3) {
+      state_default.viewer.scene.requestRender();
+      return;
+    }
+    const pts = state_default.firePoints.map((p) => [p.lon, p.lat]);
+    const hull = convexHull(pts);
+    if (hull.length < 3) return;
+    const cx = hull.reduce((s, p) => s + p[0], 0) / hull.length;
+    const cy = hull.reduce((s, p) => s + p[1], 0) / hull.length;
+    const buffered = hull.map((p) => {
+      const dx = p[0] - cx, dy = p[1] - cy;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const expand = 3e-4;
+      return [p[0] + dx / len * expand, p[1] + dy / len * expand];
+    });
+    const degreesFlat = [];
+    buffered.forEach((p) => {
+      degreesFlat.push(p[0], p[1]);
+    });
+    state_default.viewer.entities.add({
+      id: FIRE_AREA_ID,
+      polygon: {
+        hierarchy: Cesium.Cartesian3.fromDegreesArray(degreesFlat),
+        material: Cesium.Color.fromCssColorString("#ff3300").withAlpha(0.18),
+        classificationType: Cesium.ClassificationType.TERRAIN
+      }
+    });
+    const borderDegrees = [...degreesFlat, degreesFlat[0], degreesFlat[1]];
+    state_default.viewer.entities.add({
+      id: FIRE_BORDER_ID,
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArray(borderDegrees),
+        width: 3,
+        material: new Cesium.PolylineDashMaterialProperty({
+          color: Cesium.Color.fromCssColorString("#ff3300").withAlpha(0.7),
+          dashLength: 12
+        }),
+        clampToGround: true
+      }
+    });
+    state_default.viewer.scene.requestRender();
+  }
   function addFirePoint(lon, lat, height) {
     const id = `fire-${++state_default.firePointIdCounter}`;
     state_default.firePoints.push({ id, lon, lat, height });
@@ -1324,6 +1392,7 @@ var HoseCalc = (() => {
     });
     state_default.firePointEntities.push(e);
     if (!state_default.isRestoring) saveAllData();
+    updateFireArea();
     if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
     return id;
   }
@@ -1357,6 +1426,7 @@ var HoseCalc = (() => {
     document.getElementById("firePanel").classList.remove("active");
     state_default.selectedFirePoint = null;
     saveAllData();
+    updateFireArea();
   }
 
   // js/water.js
@@ -1902,6 +1972,7 @@ var HoseCalc = (() => {
     state_default.firePointEntities = [];
     state_default.selectedFirePoint = null;
     document.getElementById("firePanel").classList.remove("active");
+    updateFireArea();
     state_default.waterEntities.forEach((e) => state_default.viewer.entities.remove(e));
     state_default.waterSources = [];
     state_default.waterEntities = [];

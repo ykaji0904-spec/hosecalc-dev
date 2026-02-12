@@ -4,7 +4,31 @@ import { confirmHoseLine, addHosePoint, resetHoseLine } from './hose.js';
 import { showLoading, showToast, clearTool, closeSidePanel, showGuideBanner, hideGuideBanner } from './ui.js';
 import { geodesicDistance } from './utils.js';
 
-// 登山道トレースでホースラインを自動生成
+// ガイドバナーの状態を更新（他モジュールから呼ばれる）
+export function updateTraceGuide() {
+    if (!S.traceGuideActive) return;
+    
+    const hasTrails = trailGraph.nodes.size > 0;
+    const hasWater = S.waterSources.length > 0;
+    const hasFire = S.firePoints.length > 0;
+
+    if (hasTrails && hasWater && hasFire) {
+        // 全条件揃った → 自動実行
+        S.traceGuideActive = false;
+        hideGuideBanner();
+        setTimeout(() => executeTrace(), 300);
+        return;
+    }
+
+    showGuideBanner([
+        { label: '登山道を読み込む', done: hasTrails, active: !hasTrails },
+        { label: '水利を登録', done: hasWater, active: hasTrails && !hasWater },
+        { label: '火点を登録', done: hasFire, active: hasTrails && hasWater && !hasFire },
+        { label: 'トレース実行', done: false, active: false }
+    ]);
+}
+
+// トレースボタン押下
 export async function traceTrailRoute() {
     closeSidePanel();
     
@@ -12,26 +36,26 @@ export async function traceTrailRoute() {
     const hasWater = S.waterSources.length > 0;
     const hasFire = S.firePoints.length > 0;
 
-    // 前提が揃っていなければガイドバナーを表示
     if (!hasTrails || !hasWater || !hasFire) {
-        showGuideBanner([
-            { label: '登山道を読み込む', done: hasTrails, active: !hasTrails },
-            { label: '水利を登録', done: hasWater, active: hasTrails && !hasWater },
-            { label: '火点を登録', done: hasFire, active: hasTrails && hasWater && !hasFire },
-            { label: 'トレース実行', done: false, active: false }
-        ]);
+        // ガイドモードON
+        S.traceGuideActive = true;
+        updateTraceGuide();
         return;
     }
 
+    // 全条件揃っている → 即実行
     hideGuideBanner();
+    S.traceGuideActive = false;
+    await executeTrace();
+}
 
+// 実際のトレース処理
+async function executeTrace() {
     showLoading(true, '最適ルートを探索中...', 20);
 
-    // 最新の水利と火点を使用（複数ある場合は最後に追加されたもの）
     const water = S.waterSources[S.waterSources.length - 1];
     const fire = S.firePoints[S.firePoints.length - 1];
 
-    // 最寄りの登山道ノードを探索
     const nearWater = findNearestNode(water.lon, water.lat, 1000);
     const nearFire = findNearestNode(fire.lon, fire.lat, 1000);
 
@@ -48,7 +72,6 @@ export async function traceTrailRoute() {
 
     showLoading(true, 'ダイクストラ探索中...', 40);
 
-    // ダイクストラで最短経路
     const result = dijkstra(nearWater.id, nearFire.id);
     if (!result) {
         showLoading(false);
@@ -56,21 +79,16 @@ export async function traceTrailRoute() {
         return;
     }
 
-    showLoading(true, `ルート発見（${result.path.length}ポイント, ${(result.totalDist / 1000).toFixed(1)}km）標高取得中...`, 60);
+    showLoading(true, `ルート発見（${result.path.length}点, ${(result.totalDist / 1000).toFixed(1)}km）標高取得中...`, 60);
 
-    // 水利→最寄り登山道の直線区間を先頭に追加
     const fullPath = [{ lon: water.lon, lat: water.lat }];
-    // 登山道経路を追加
     fullPath.push(...result.path);
-    // 登山道→火点の直線区間を末尾に追加
     fullPath.push({ lon: fire.lon, lat: fire.lat });
 
-    // パスを適度に間引き（Cesiumのterrain queryは重いので最大100ポイント）
     const simplified = simplifyPath(fullPath, 100);
 
     showLoading(true, '標高データを取得中...', 70);
 
-    // 標高取得
     const cartographics = simplified.map(p => Cesium.Cartographic.fromDegrees(p.lon, p.lat));
     try {
         const updated = await Cesium.sampleTerrainMostDetailed(S.viewer.terrainProvider, cartographics);
@@ -78,13 +96,12 @@ export async function traceTrailRoute() {
             simplified[i].height = updated[i].height || 0;
         }
     } catch (e) {
-        console.warn('Terrain sampling failed, using 0:', e);
+        console.warn('Terrain sampling failed:', e);
         simplified.forEach(p => p.height = p.height || 0);
     }
 
     showLoading(true, 'ホースラインを生成中...', 90);
 
-    // ホースツールをアクティブにしてポイントを追加
     clearTool();
     S.currentTool = 'hose';
     const ind = document.getElementById('modeIndicator');
@@ -96,7 +113,6 @@ export async function traceTrailRoute() {
     document.getElementById('hosePanel').classList.add('active');
     resetHoseLine();
 
-    // ポイントを追加
     for (const p of simplified) {
         const cartesian = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.height);
         addHosePoint(p.lon, p.lat, p.height, cartesian);
@@ -109,18 +125,14 @@ export async function traceTrailRoute() {
     S.viewer.scene.requestRender();
 }
 
-// パスの間引き（Douglas-Peucker簡易版 + 均等サンプリング）
 function simplifyPath(path, maxPoints) {
     if (path.length <= maxPoints) return path;
-
-    // 均等サンプリング
     const step = (path.length - 1) / (maxPoints - 1);
     const result = [];
     for (let i = 0; i < maxPoints; i++) {
         const idx = Math.min(Math.round(i * step), path.length - 1);
         result.push(path[idx]);
     }
-    // 必ず最初と最後を含める
     result[0] = path[0];
     result[result.length - 1] = path[path.length - 1];
     return result;

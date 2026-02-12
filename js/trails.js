@@ -34,7 +34,8 @@ export async function loadTrails() {
         if (success) break;
         try {
             const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
-            const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out body;>;out skel qt;`;
+            // out geom: ノード別取得不要、way内にgeometry直接含む（大幅高速化）
+            const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 25000);
             showLoading(true, 'サーバーに接続中...', 50);
@@ -50,37 +51,36 @@ export async function loadTrails() {
             const data = await res.json();
             if (!data.elements) continue;
 
-            const nodes = new Map();
-            data.elements.forEach(e => { if (e.type === 'node') nodes.set(e.id, [e.lon, e.lat]); });
-            const ways = data.elements.filter(e => e.type === 'way');
+            const ways = data.elements.filter(e => e.type === 'way' && e.geometry);
 
-            // グラフ構築
+            // グラフ構築（out geomなのでgeometry配列から直接構築）
             let newNodes = 0, newEdges = 0;
-            const wayEndpoints = []; // 各wayの端点を記録
+            const wayEndpoints = [];
             ways.forEach(way => {
-                const wayNodes = way.nodes.filter(nid => nodes.has(nid));
-                for (let i = 0; i < wayNodes.length; i++) {
-                    const nid = wayNodes[i];
+                const geom = way.geometry;
+                const nodeIds = way.nodes || [];
+                for (let i = 0; i < geom.length; i++) {
+                    const nid = nodeIds[i] || `${way.id}-${i}`;
+                    const { lon, lat } = geom[i];
                     if (!trailGraph.nodes.has(nid)) {
-                        const [lon, lat] = nodes.get(nid);
                         trailGraph.nodes.set(nid, { lon, lat });
                         newNodes++;
                     }
                     if (i > 0) {
-                        const prev = wayNodes[i - 1];
-                        const [lon1, lat1] = nodes.get(prev);
-                        const [lon2, lat2] = nodes.get(nid);
+                        const prev = nodeIds[i - 1] || `${way.id}-${i - 1}`;
                         const existing = trailGraph.edges.get(prev);
                         if (!existing || !existing.some(e => e.to === nid)) {
-                            const dist = haversineDistance(lon1, lat1, lon2, lat2);
+                            const dist = haversineDistance(geom[i - 1].lon, geom[i - 1].lat, lon, lat);
                             addEdge(prev, nid, dist);
                             newEdges++;
                         }
                     }
                 }
-                // 端点を記録
-                if (wayNodes.length >= 2) {
-                    wayEndpoints.push(wayNodes[0], wayNodes[wayNodes.length - 1]);
+                if (geom.length >= 2) {
+                    wayEndpoints.push(
+                        nodeIds[0] || `${way.id}-0`,
+                        nodeIds[geom.length - 1] || `${way.id}-${geom.length - 1}`
+                    );
                 }
             });
 
@@ -110,7 +110,7 @@ export async function loadTrails() {
             showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
             ways.forEach(way => {
                 if (S.trailEntities.some(e => e.osmId === way.id)) return;
-                const pos = way.nodes.filter(nid => nodes.has(nid)).map(nid => { const n = nodes.get(nid); return Cesium.Cartesian3.fromDegrees(n[0], n[1]); });
+                const pos = way.geometry.map(g => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
                 if (pos.length >= 2) {
                     const e = S.viewer.entities.add({ polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true } });
                     e.show = S.layers.trails; e.osmId = way.id;

@@ -209,6 +209,34 @@ var HoseCalc = (() => {
   function closeInfoModal() {
     document.getElementById("infoModalOverlay").classList.remove("show");
   }
+  function showGuideBanner(steps) {
+    let el = document.getElementById("guideBanner");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "guideBanner";
+      document.body.appendChild(el);
+    }
+    el.innerHTML = `
+        <div class="guide-banner-header">
+            <span class="material-icons">timeline</span>
+            \u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9
+            <button class="guide-close" onclick="hideGuideBanner()">\u2715</button>
+        </div>
+        <div class="guide-steps">
+            ${steps.map((s, i) => `
+                <div class="guide-step ${s.done ? "done" : ""} ${s.active ? "active" : ""}">
+                    <span class="guide-num">${s.done ? "\u2713" : i + 1}</span>
+                    <span class="guide-label">${s.label}</span>
+                </div>
+            `).join('<div class="guide-arrow">\u2192</div>')}
+        </div>
+    `;
+    el.classList.add("show");
+  }
+  function hideGuideBanner() {
+    const el = document.getElementById("guideBanner");
+    if (el) el.classList.remove("show");
+  }
   var INFO_CONTENT;
   var init_ui = __esm({
     "js/ui.js"() {
@@ -1479,18 +1507,19 @@ var HoseCalc = (() => {
   init_ui();
   async function traceTrailRoute() {
     closeSidePanel();
-    if (trailGraph.nodes.size === 0) {
-      showToast("\u5148\u306B\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u304F\u3060\u3055\u3044");
+    const hasTrails = trailGraph.nodes.size > 0;
+    const hasWater = state_default.waterSources.length > 0;
+    const hasFire = state_default.firePoints.length > 0;
+    if (!hasTrails || !hasWater || !hasFire) {
+      showGuideBanner([
+        { label: "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3080", done: hasTrails, active: !hasTrails },
+        { label: "\u6C34\u5229\u3092\u767B\u9332", done: hasWater, active: hasTrails && !hasWater },
+        { label: "\u706B\u70B9\u3092\u767B\u9332", done: hasFire, active: hasTrails && hasWater && !hasFire },
+        { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
+      ]);
       return;
     }
-    if (state_default.waterSources.length === 0) {
-      showToast("\u6C34\u5229\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044");
-      return;
-    }
-    if (state_default.firePoints.length === 0) {
-      showToast("\u706B\u70B9\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044");
-      return;
-    }
+    hideGuideBanner();
     showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
     const water = state_default.waterSources[state_default.waterSources.length - 1];
     const fire = state_default.firePoints[state_default.firePoints.length - 1];
@@ -1665,6 +1694,7 @@ var HoseCalc = (() => {
     hideMarkerPopup,
     showInfo,
     closeInfoModal,
+    hideGuideBanner,
     deleteSelectedFire,
     confirmWaterType,
     undoHosePoint,

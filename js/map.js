@@ -5,21 +5,30 @@ import { updateLayerCards, showToast } from './ui.js';
 export function initViewer() {
     Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
 
-    S.viewer = new Cesium.Viewer('cesiumContainer', {
-        imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }),
-        terrainProvider: Cesium.createWorldTerrain({ requestWaterMask: false, requestVertexNormals: false }),
-        baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
-        navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
-        infoBox: false, selectionIndicator: false,
-        requestRenderMode: false, targetFrameRate: 30, msaaSamples: 1
-    });
+    try {
+        S.viewer = new Cesium.Viewer('cesiumContainer', {
+            imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }),
+            terrainProvider: Cesium.createWorldTerrain({ requestWaterMask: false, requestVertexNormals: false }),
+            baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+            navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
+            infoBox: false, selectionIndicator: false,
+            requestRenderMode: false, msaaSamples: 1
+        });
+    } catch (e) {
+        console.error('Cesium Viewer init failed:', e);
+        return null;
+    }
 
     const v = S.viewer;
+
+    // Globe rendering settings - PCの大画面でも素早くタイルを表示
     v.scene.globe.tileCacheSize = 1000;
-    v.scene.globe.maximumScreenSpaceError = 2;
+    v.scene.globe.maximumScreenSpaceError = 4; // PC: 2は厳しすぎる→4で高速化
     v.scene.fog.enabled = false;
     v.scene.skyAtmosphere.show = false;
+    v.scene.globe.showGroundAtmosphere = false;
 
+    // Camera controls
     v.scene.screenSpaceCameraController.enableRotate = true;
     v.scene.screenSpaceCameraController.enableTranslate = true;
     v.scene.screenSpaceCameraController.enableZoom = true;
@@ -29,6 +38,7 @@ export function initViewer() {
     v.scene.screenSpaceCameraController.inertiaTranslate = 0.5;
     v.scene.screenSpaceCameraController.inertiaZoom = 0.5;
 
+    // Initial camera position
     v.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(DEFAULT_POSITION.lon, DEFAULT_POSITION.lat, DEFAULT_POSITION.height)
     });
@@ -39,6 +49,24 @@ export function initViewer() {
         new Cesium.UrlTemplateImageryProvider({ url: GSI_TILE_URL, maximumLevel: 18 })
     );
     S.stdLayer.show = false;
+
+    // Force resize to ensure container dimensions are correct (ESModule defer fix)
+    v.resize();
+    v.scene.requestRender();
+
+    // Re-resize on window resize
+    window.addEventListener('resize', () => {
+        v.resize();
+        v.scene.requestRender();
+    });
+
+    // Force multiple render passes during initial tile load
+    let renderKicks = 0;
+    const renderInterval = setInterval(() => {
+        v.scene.requestRender();
+        renderKicks++;
+        if (renderKicks > 10) clearInterval(renderInterval);
+    }, 500);
 
     // Scale bar
     v.camera.moveEnd.addEventListener(updateScaleBar);
@@ -93,7 +121,6 @@ export function toggleMapLayer(layer) {
     if (layer === 'trails') {
         S.trailEntities.forEach(e => e.show = S.layers.trails);
         if (S.layers.trails) {
-            // Dynamically import trails to avoid loading until needed
             import('./trails.js').then(m => m.loadTrails());
         }
     }
@@ -150,6 +177,7 @@ function updateScaleBar() {
     try {
         const v = S.viewer;
         const width = v.canvas.clientWidth;
+        if (width === 0) return; // Container not yet sized
         const left = v.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.3, v.canvas.clientHeight / 2));
         const right = v.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.7, v.canvas.clientHeight / 2));
         if (!left || !right) return;

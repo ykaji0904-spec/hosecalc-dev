@@ -237,8 +237,24 @@ var HoseCalc = (() => {
   // js/trails.js
   var trails_exports = {};
   __export(trails_exports, {
-    loadTrails: () => loadTrails
+    dijkstra: () => dijkstra,
+    findNearestNode: () => findNearestNode,
+    loadTrails: () => loadTrails,
+    trailGraph: () => trailGraph
   });
+  function haversineDistance(lon1, lat1, lon2, lat2) {
+    const R = 6371e3;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function addEdge(from, to, dist) {
+    if (!trailGraph.edges.has(from)) trailGraph.edges.set(from, []);
+    if (!trailGraph.edges.has(to)) trailGraph.edges.set(to, []);
+    trailGraph.edges.get(from).push({ to, dist });
+    trailGraph.edges.get(to).push({ to: from, dist });
+  }
   async function loadTrails() {
     if (state_default.trailLoadActive) return;
     const c = state_default.viewer.camera.positionCartographic;
@@ -271,6 +287,29 @@ var HoseCalc = (() => {
           if (e.type === "node") nodes.set(e.id, [e.lon, e.lat]);
         });
         const ways = data.elements.filter((e) => e.type === "way");
+        let newNodes = 0, newEdges = 0;
+        ways.forEach((way) => {
+          const wayNodes = way.nodes.filter((nid) => nodes.has(nid));
+          for (let i = 0; i < wayNodes.length; i++) {
+            const nid = wayNodes[i];
+            if (!trailGraph.nodes.has(nid)) {
+              const [lon2, lat2] = nodes.get(nid);
+              trailGraph.nodes.set(nid, { lon: lon2, lat: lat2 });
+              newNodes++;
+            }
+            if (i > 0) {
+              const prev = wayNodes[i - 1];
+              const [lon1, lat1] = nodes.get(prev);
+              const [lon2, lat2] = nodes.get(nid);
+              const existing = trailGraph.edges.get(prev);
+              if (!existing || !existing.some((e) => e.to === nid)) {
+                const dist = haversineDistance(lon1, lat1, lon2, lat2);
+                addEdge(prev, nid, dist);
+                newEdges++;
+              }
+            }
+          }
+        });
         showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
         ways.forEach((way) => {
           if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
@@ -287,7 +326,8 @@ var HoseCalc = (() => {
         });
         state_default.viewer.scene.requestRender();
         showLoading(true, "\u5B8C\u4E86", 100);
-        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C`);
+        console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges`);
+        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9\uFF09`);
         else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
         success = true;
       } catch (e) {
@@ -298,11 +338,60 @@ var HoseCalc = (() => {
     state_default.trailLoadActive = false;
     setTimeout(() => showLoading(false), 300);
   }
+  function findNearestNode(lon, lat, maxDistM = 500) {
+    let bestId = null, bestDist = Infinity;
+    for (const [id, node] of trailGraph.nodes) {
+      const d = haversineDistance(lon, lat, node.lon, node.lat);
+      if (d < bestDist) {
+        bestDist = d;
+        bestId = id;
+      }
+    }
+    if (bestDist > maxDistM) return null;
+    return { id: bestId, dist: bestDist };
+  }
+  function dijkstra(startId, endId) {
+    if (!trailGraph.edges.has(startId) || !trailGraph.edges.has(endId)) return null;
+    const dist = /* @__PURE__ */ new Map();
+    const prev = /* @__PURE__ */ new Map();
+    const visited = /* @__PURE__ */ new Set();
+    const queue = [];
+    dist.set(startId, 0);
+    queue.push({ id: startId, d: 0 });
+    while (queue.length > 0) {
+      queue.sort((a, b) => a.d - b.d);
+      const { id: current2 } = queue.shift();
+      if (visited.has(current2)) continue;
+      visited.add(current2);
+      if (current2 === endId) break;
+      const edges = trailGraph.edges.get(current2) || [];
+      for (const edge of edges) {
+        if (visited.has(edge.to)) continue;
+        const newDist = dist.get(current2) + edge.dist;
+        if (!dist.has(edge.to) || newDist < dist.get(edge.to)) {
+          dist.set(edge.to, newDist);
+          prev.set(edge.to, current2);
+          queue.push({ id: edge.to, d: newDist });
+        }
+      }
+    }
+    if (!prev.has(endId) && startId !== endId) return null;
+    const path = [];
+    let current = endId;
+    while (current !== void 0) {
+      const node = trailGraph.nodes.get(current);
+      if (node) path.unshift({ lon: node.lon, lat: node.lat });
+      current = prev.get(current);
+    }
+    return path.length >= 2 ? { path, totalDist: dist.get(endId) || 0 } : null;
+  }
+  var trailGraph;
   var init_trails = __esm({
     "js/trails.js"() {
       init_state();
       init_config();
       init_ui();
+      trailGraph = { nodes: /* @__PURE__ */ new Map(), edges: /* @__PURE__ */ new Map() };
     }
   });
 
@@ -1379,6 +1468,95 @@ var HoseCalc = (() => {
     });
   }
 
+  // js/trace.js
+  init_state();
+  init_trails();
+  init_ui();
+  async function traceTrailRoute() {
+    closeSidePanel();
+    if (trailGraph.nodes.size === 0) {
+      showToast("\u5148\u306B\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u304F\u3060\u3055\u3044");
+      return;
+    }
+    if (state_default.waterSources.length === 0) {
+      showToast("\u6C34\u5229\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044");
+      return;
+    }
+    if (state_default.firePoints.length === 0) {
+      showToast("\u706B\u70B9\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044");
+      return;
+    }
+    showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
+    const water = state_default.waterSources[state_default.waterSources.length - 1];
+    const fire = state_default.firePoints[state_default.firePoints.length - 1];
+    const nearWater = findNearestNode(water.lon, water.lat, 1e3);
+    const nearFire = findNearestNode(fire.lon, fire.lat, 1e3);
+    if (!nearWater) {
+      showLoading(false);
+      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      return;
+    }
+    if (!nearFire) {
+      showLoading(false);
+      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      return;
+    }
+    showLoading(true, "\u30C0\u30A4\u30AF\u30B9\u30C8\u30E9\u63A2\u7D22\u4E2D...", 40);
+    const result = dijkstra(nearWater.id, nearFire.id);
+    if (!result) {
+      showLoading(false);
+      showToast("\u6C34\u5229\u2192\u706B\u70B9\u306E\u7D4C\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF08\u9053\u304C\u3064\u306A\u304C\u3063\u3066\u3044\u306A\u3044\u53EF\u80FD\u6027\uFF09");
+      return;
+    }
+    showLoading(true, `\u30EB\u30FC\u30C8\u767A\u898B\uFF08${result.path.length}\u30DD\u30A4\u30F3\u30C8, ${(result.totalDist / 1e3).toFixed(1)}km\uFF09\u6A19\u9AD8\u53D6\u5F97\u4E2D...`, 60);
+    const fullPath = [{ lon: water.lon, lat: water.lat }];
+    fullPath.push(...result.path);
+    fullPath.push({ lon: fire.lon, lat: fire.lat });
+    const simplified = simplifyPath(fullPath, 100);
+    showLoading(true, "\u6A19\u9AD8\u30C7\u30FC\u30BF\u3092\u53D6\u5F97\u4E2D...", 70);
+    const cartographics = simplified.map((p) => Cesium.Cartographic.fromDegrees(p.lon, p.lat));
+    try {
+      const updated = await Cesium.sampleTerrainMostDetailed(state_default.viewer.terrainProvider, cartographics);
+      for (let i = 0; i < simplified.length; i++) {
+        simplified[i].height = updated[i].height || 0;
+      }
+    } catch (e) {
+      console.warn("Terrain sampling failed, using 0:", e);
+      simplified.forEach((p) => p.height = p.height || 0);
+    }
+    showLoading(true, "\u30DB\u30FC\u30B9\u30E9\u30A4\u30F3\u3092\u751F\u6210\u4E2D...", 90);
+    clearTool();
+    state_default.currentTool = "hose";
+    const ind = document.getElementById("modeIndicator");
+    const icon = document.getElementById("modeIcon");
+    const text = document.getElementById("modeText");
+    icon.textContent = "route";
+    text.textContent = "\u30DB\u30FC\u30B9\u5EF6\u9577";
+    ind.className = "mode-indicator show hose-mode";
+    document.getElementById("hosePanel").classList.add("active");
+    resetHoseLine();
+    for (const p of simplified) {
+      const cartesian = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.height);
+      addHosePoint(p.lon, p.lat, p.height, cartesian);
+    }
+    showLoading(false);
+    const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
+    showToast(`\u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
+    state_default.viewer.scene.requestRender();
+  }
+  function simplifyPath(path, maxPoints) {
+    if (path.length <= maxPoints) return path;
+    const step = (path.length - 1) / (maxPoints - 1);
+    const result = [];
+    for (let i = 0; i < maxPoints; i++) {
+      const idx = Math.min(Math.round(i * step), path.length - 1);
+      result.push(path[idx]);
+    }
+    result[0] = path[0];
+    result[result.length - 1] = path[path.length - 1];
+    return result;
+  }
+
   // js/app.js
   window.onerror = function(msg, url, line, col, err) {
     console.error("[HoseCalc Error]", msg, url, line, col, err);
@@ -1496,7 +1674,8 @@ var HoseCalc = (() => {
     _flyToSearch: flyToSearch,
     setOperation,
     clearAllDataConfirm,
-    shareSimulation
+    shareSimulation,
+    traceTrailRoute
   });
   function boot() {
     console.log("[HoseCalc] Boot: starting...");

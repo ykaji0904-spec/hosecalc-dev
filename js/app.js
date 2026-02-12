@@ -1,6 +1,6 @@
 import S from './state.js';
 import { initViewer, setBasemap, setViewMode, toggleMapLayer, toggleHazardLayer, goToMyLocation, initLocation } from './map.js';
-import { showLoading, showToast, openSidePanel, closeSidePanel, updateLayerCards, clearTool, closeAllPanels, closePanel, copyCoords, copyText, copyMarkerCoords, hideCoordPopup, hideMarkerPopup, showInfo, closeInfoModal } from './ui.js';
+import { showLoading, showToast, openSidePanel, closeSidePanel, updateLayerCards, clearTool, closeAllPanels, closePanel, copyCoords, copyText, copyMarkerCoords, hideCoordPopup, hideMarkerPopup, showInfo, closeInfoModal, hideGuideBanner } from './ui.js';
 import { addFirePoint, selectFirePoint, deleteSelectedFire } from './fire.js';
 import { addWaterSource, selectWater, deleteSelectedWater, showWaterPicker, hideWaterPicker, confirmWaterType } from './water.js';
 import { addHosePoint, undoHosePoint, resetHoseLine, closeHosePanel, confirmHoseLine, selectHoseLine, deleteSelectedHose, onParamChange, clearSimulationVisuals, runSimulationForLine } from './hose.js';
@@ -76,7 +76,7 @@ async function restoreData() {
 Object.assign(window, {
     setBasemap, setViewMode, toggleMapLayer, toggleHazardLayer, goToMyLocation,
     openSidePanel, closeSidePanel, closePanel, copyCoords, copyText, copyMarkerCoords,
-    hideCoordPopup, hideMarkerPopup, showInfo, closeInfoModal,
+    hideCoordPopup, hideMarkerPopup, showInfo, closeInfoModal, hideGuideBanner,
     deleteSelectedFire, confirmWaterType,
     undoHosePoint, resetHoseLine, closeHosePanel, confirmHoseLine, deleteSelectedHose, onParamChange,
     resetMeasure, closeMeasurePanel,

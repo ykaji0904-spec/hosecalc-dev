@@ -5,11 +5,32 @@ import { saveAllData } from './storage.js';
 function createFireIcon() {
     const c = document.createElement('canvas'); c.width = 32; c.height = 32;
     const ctx = c.getContext('2d');
-    ctx.beginPath(); ctx.arc(16, 16, 14, 0, Math.PI * 2);
-    ctx.fillStyle = '#f44336'; ctx.fill();
-    ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = 'white'; ctx.font = 'bold 16px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔥', 16, 16);
+    // Outer flame (orange-red)
+    ctx.beginPath();
+    ctx.moveTo(16, 2);
+    ctx.bezierCurveTo(18, 8, 26, 12, 26, 20);
+    ctx.bezierCurveTo(26, 26, 21, 30, 16, 30);
+    ctx.bezierCurveTo(11, 30, 6, 26, 6, 20);
+    ctx.bezierCurveTo(6, 12, 14, 8, 16, 2);
+    ctx.closePath();
+    const gOuter = ctx.createRadialGradient(16, 22, 2, 16, 18, 14);
+    gOuter.addColorStop(0, '#ff6600');
+    gOuter.addColorStop(0.6, '#e53935');
+    gOuter.addColorStop(1, '#b71c1c');
+    ctx.fillStyle = gOuter; ctx.fill();
+    // Inner flame (yellow)
+    ctx.beginPath();
+    ctx.moveTo(16, 10);
+    ctx.bezierCurveTo(17, 14, 22, 16, 22, 21);
+    ctx.bezierCurveTo(22, 25, 19, 28, 16, 28);
+    ctx.bezierCurveTo(13, 28, 10, 25, 10, 21);
+    ctx.bezierCurveTo(10, 16, 15, 14, 16, 10);
+    ctx.closePath();
+    const gInner = ctx.createRadialGradient(16, 23, 1, 16, 20, 8);
+    gInner.addColorStop(0, '#fff176');
+    gInner.addColorStop(0.5, '#ffb300');
+    gInner.addColorStop(1, '#ff6600');
+    ctx.fillStyle = gInner; ctx.fill();
     return c.toDataURL();
 }
 

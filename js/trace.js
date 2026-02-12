@@ -1,26 +1,29 @@
 import S from './state.js';
 import { trailGraph, findNearestNode, dijkstra } from './trails.js';
 import { confirmHoseLine, addHosePoint, resetHoseLine } from './hose.js';
-import { showLoading, showToast, clearTool, closeSidePanel } from './ui.js';
+import { showLoading, showToast, clearTool, closeSidePanel, showGuideBanner, hideGuideBanner } from './ui.js';
 import { geodesicDistance } from './utils.js';
 
 // 登山道トレースでホースラインを自動生成
 export async function traceTrailRoute() {
     closeSidePanel();
     
-    // 前提チェック
-    if (trailGraph.nodes.size === 0) {
-        showToast('先に登山道を読み込んでください');
+    const hasTrails = trailGraph.nodes.size > 0;
+    const hasWater = S.waterSources.length > 0;
+    const hasFire = S.firePoints.length > 0;
+
+    // 前提が揃っていなければガイドバナーを表示
+    if (!hasTrails || !hasWater || !hasFire) {
+        showGuideBanner([
+            { label: '登山道を読み込む', done: hasTrails, active: !hasTrails },
+            { label: '水利を登録', done: hasWater, active: hasTrails && !hasWater },
+            { label: '火点を登録', done: hasFire, active: hasTrails && hasWater && !hasFire },
+            { label: 'トレース実行', done: false, active: false }
+        ]);
         return;
     }
-    if (S.waterSources.length === 0) {
-        showToast('水利を登録してください');
-        return;
-    }
-    if (S.firePoints.length === 0) {
-        showToast('火点を登録してください');
-        return;
-    }
+
+    hideGuideBanner();
 
     showLoading(true, '最適ルートを探索中...', 20);
 

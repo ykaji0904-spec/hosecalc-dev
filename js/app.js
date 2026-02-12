@@ -12,8 +12,6 @@ import { initEventHandlers } from './events.js';
 
 // === Initialize ===
 
-const viewer = initViewer();
-
 function setOperation(op) {
     if (S.currentTool === op) { clearTool(); updateLayerCards(); return; }
     clearTool(); S.currentTool = op;
@@ -101,8 +99,14 @@ Object.assign(window, {
 
 // === Boot ===
 
-showLoading(false);
-updateLayerCards();
-initEventHandlers();
-initLocation();
-setTimeout(() => restoreData(), 1500);
+const viewer = initViewer();
+if (!viewer) {
+    document.getElementById('loadingMessage').textContent = '地図の初期化に失敗しました。ページを再読み込みしてください。';
+    document.getElementById('loadingOverlay').classList.add('show');
+} else {
+    showLoading(false);
+    updateLayerCards();
+    initEventHandlers();
+    initLocation();
+    setTimeout(() => restoreData(), 1500);
+}

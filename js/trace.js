@@ -32,21 +32,23 @@ export function updateTraceGuide() {
     // 次のステップへ自動遷移
     if (hasTrails && !hasWater) {
         // 登山道完了 → 水利モードに自動切替
-        activateTool('water', 'water_drop', '水利を地図にタップ', 'water-mode');
+        activateTool('water', 'water_drop', '水利を地図にタップ', 'water-mode', '水源の位置（消火栓・防火水槽など）をタップ');
     } else if (hasTrails && hasWater && !hasFire) {
         // 水利完了 → 火点モードに自動切替
-        activateTool('fire', 'local_fire_department', '火点を地図にタップ', '');
+        activateTool('fire', 'local_fire_department', '火点を地図にタップ', '', '火災地点をタップ');
     }
 }
 
-function activateTool(tool, icon, label, modeClass) {
+function activateTool(tool, icon, label, modeClass, hintText) {
     clearTool();
     S.currentTool = tool;
     const ind = document.getElementById('modeIndicator');
     const ic = document.getElementById('modeIcon');
     const tx = document.getElementById('modeText');
+    const ht = document.getElementById('modeHint');
     ic.textContent = icon;
     tx.textContent = label;
+    if (ht) ht.textContent = hintText || '';
     ind.className = 'mode-indicator show ' + modeClass;
     updateLayerCards();
 }
@@ -81,7 +83,7 @@ export async function traceTrailRoute() {
         ]);
     } else if (!hasWater) {
         // 水利モードに切替
-        activateTool('water', 'water_drop', '水利を地図にタップ', 'water-mode');
+        activateTool('water', 'water_drop', '水利を地図にタップ', 'water-mode', '水源の位置（消火栓・防火水槽など）をタップ');
         showGuideBanner([
             { label: '登山道読み込み', done: true, active: false },
             { label: '水利を地図にタップ', done: false, active: true },
@@ -90,7 +92,7 @@ export async function traceTrailRoute() {
         ]);
     } else {
         // 火点モードに切替
-        activateTool('fire', 'local_fire_department', '火点を地図にタップ', '');
+        activateTool('fire', 'local_fire_department', '火点を地図にタップ', '', '火災地点をタップ');
         showGuideBanner([
             { label: '登山道読み込み', done: true, active: false },
             { label: '水利を地図にタップ', done: true, active: false },

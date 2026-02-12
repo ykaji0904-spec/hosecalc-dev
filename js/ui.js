@@ -161,12 +161,13 @@ export function showGuideBanner(steps) {
             <button class="guide-close" onclick="hideGuideBanner()">✕</button>
         </div>
         <div class="guide-steps">
-            ${steps.map((s, i) => `
-                <div class="guide-step ${s.done ? 'done' : ''} ${s.active ? 'active' : ''}">
+            ${steps.map((s, i) => {
+                const cls = `guide-step ${s.done ? 'done' : ''} ${s.active ? 'active' : ''} ${s.action ? 'tappable' : ''}`;
+                return `<div class="${cls}" ${s.action ? `onclick="${s.action}"` : ''}>
                     <span class="guide-num">${s.done ? '✓' : i + 1}</span>
                     <span class="guide-label">${s.label}</span>
-                </div>
-            `).join('<div class="guide-arrow">→</div>')}
+                </div>`;
+            }).join('<div class="guide-arrow">→</div>')}
         </div>
     `;
     el.classList.add('show');

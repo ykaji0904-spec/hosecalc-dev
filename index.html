@@ -79,13 +79,15 @@
         .feature-item-content{flex:1}
         .feature-item-title{color:white;font-size:12px;font-weight:600;margin-bottom:2px}
         .feature-item-desc{color:rgba(255,255,255,0.5);font-size:10px;line-height:1.4}
-        .mode-indicator{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(244,67,54,0.95);padding:8px 16px;border-radius:20px;display:none;align-items:center;gap:8px;z-index:1000}
+        .mode-indicator{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(244,67,54,0.95);padding:0;border-radius:16px;display:none;flex-direction:column;align-items:center;z-index:1000;min-width:200px;max-width:85vw;backdrop-filter:blur(8px);overflow:hidden}
         .mode-indicator.show{display:flex}
         .mode-indicator.water-mode{background:rgba(33,150,243,0.95)}
         .mode-indicator.hose-mode{background:rgba(255,152,0,0.95)}
         .mode-indicator.measure-mode{background:rgba(0,212,255,0.95)}
         .mode-indicator .material-icons{color:white;font-size:18px}
         .mode-indicator span{color:white;font-size:13px;font-weight:600}
+        .mode-head{display:flex;align-items:center;gap:8px;padding:8px 16px}
+        .mode-hint{font-size:11px;color:rgba(255,255,255,0.9);font-weight:400;padding:6px 16px 8px;border-top:1px solid rgba(255,255,255,0.2);width:100%;text-align:center;box-sizing:border-box;line-height:1.4}
         .coord-popup{position:fixed;background:rgba(30,30,30,0.95);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);z-index:1500;display:none}
         .coord-popup.show{display:block}
         .coord-popup-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
@@ -277,7 +279,7 @@
     <div class="toast" id="toast"></div>
     <div class="coord-popup" id="coordPopup"><div class="coord-popup-header"><span class="coord-popup-title">座標</span><button class="coord-popup-close" onclick="hideCoordPopup()">×</button></div><div class="coord-popup-value" id="coordPopupValue">-</div><button class="coord-popup-btn" onclick="copyCoords()"><span class="material-icons">content_copy</span>コピー</button></div>
     <div class="marker-popup" id="markerPopup"><div class="marker-popup-header"><span class="marker-popup-name" id="markerPopupName">-</span><button class="marker-popup-close" onclick="hideMarkerPopup()">×</button></div><div class="marker-popup-coord" id="markerPopupCoord">-</div><div class="marker-popup-elev" id="markerPopupElev">-</div><button class="marker-popup-btn" onclick="copyMarkerCoords()"><span class="material-icons">content_copy</span>コピー</button></div>
-    <div class="mode-indicator" id="modeIndicator"><span class="material-icons" id="modeIcon">local_fire_department</span><span id="modeText">火点追加</span></div>
+    <div class="mode-indicator" id="modeIndicator"><div class="mode-head"><span class="material-icons" id="modeIcon">local_fire_department</span><span id="modeText">火点追加</span></div><div class="mode-hint" id="modeHint"></div></div>
     <div class="water-picker" id="waterPicker">
         <div class="water-picker-title">水利の種別を選択</div>
         <div class="water-picker-grid">

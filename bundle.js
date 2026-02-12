@@ -854,6 +854,7 @@ var HoseCalc = (() => {
         });
         const ways = data.elements.filter((e) => e.type === "way");
         let newNodes = 0, newEdges = 0;
+        const wayEndpoints = [];
         ways.forEach((way) => {
           const wayNodes = way.nodes.filter((nid) => nodes.has(nid));
           for (let i = 0; i < wayNodes.length; i++) {
@@ -875,7 +876,30 @@ var HoseCalc = (() => {
               }
             }
           }
+          if (wayNodes.length >= 2) {
+            wayEndpoints.push(wayNodes[0], wayNodes[wayNodes.length - 1]);
+          }
         });
+        const BRIDGE_MAX_M = 25;
+        let bridgeCount = 0;
+        const uniqueEndpoints = [...new Set(wayEndpoints)];
+        for (let i = 0; i < uniqueEndpoints.length; i++) {
+          const a = uniqueEndpoints[i];
+          const nodeA = trailGraph.nodes.get(a);
+          if (!nodeA) continue;
+          for (let j = i + 1; j < uniqueEndpoints.length; j++) {
+            const b = uniqueEndpoints[j];
+            const nodeB = trailGraph.nodes.get(b);
+            if (!nodeB) continue;
+            const edgesA = trailGraph.edges.get(a);
+            if (edgesA && edgesA.some((e) => e.to === b)) continue;
+            const dist = haversineDistance(nodeA.lon, nodeA.lat, nodeB.lon, nodeB.lat);
+            if (dist <= BRIDGE_MAX_M) {
+              addEdge(a, b, dist);
+              bridgeCount++;
+            }
+          }
+        }
         showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
         ways.forEach((way) => {
           if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
@@ -892,8 +916,8 @@ var HoseCalc = (() => {
         });
         state_default.viewer.scene.requestRender();
         showLoading(true, "\u5B8C\u4E86", 100);
-        console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges`);
-        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9\uFF09`);
+        console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(\u226425m)`);
+        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
         else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
         success = true;
         if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());

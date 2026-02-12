@@ -876,17 +876,16 @@ var HoseCalc = (() => {
     const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
     const radius = TRAIL_RADIUS;
     state_default.trailLoadActive = true;
-    showLoading(true, "\u9053\u8DEF\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D...", 30);
+    showLoading(true, "\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D...", 30);
     let success = false;
     for (const server of OVERPASS_SERVERS) {
       if (success) break;
       try {
         const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
-        const hwTypes = "path|track|footway|residential|unclassified|tertiary|secondary|service|living_street|pedestrian";
-        const query = `[out:json][timeout:60];(way["highway"~"^(${hwTypes})$"](${bbox}););out geom qt;`;
+        const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 55e3);
-        showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...\uFF08\u9053\u8DEF\u30C7\u30FC\u30BF\u53D6\u5F97\uFF09", 50);
+        const timeoutId = setTimeout(() => controller.abort(), 25e3);
+        showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...", 50);
         const res = await fetch(server, {
           method: "POST",
           body: "data=" + encodeURIComponent(query),
@@ -948,7 +947,7 @@ var HoseCalc = (() => {
             }
           }
         }
-        showLoading(true, `${ways.length}\u672C\u306E\u9053\u8DEF\u3092\u63CF\u753B\u4E2D...`, 85);
+        showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
         ways.forEach((way) => {
           if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
           const pos = way.geometry.map((g) => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
@@ -962,15 +961,15 @@ var HoseCalc = (() => {
         state_default.viewer.scene.requestRender();
         showLoading(true, "\u5B8C\u4E86", 100);
         console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(\u226425m)`);
-        if (ways.length > 0) showToast(`\u9053\u8DEF ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
-        else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u9053\u8DEF\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
+        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
+        else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
         success = true;
         if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
       } catch (e) {
         console.log("Trail server failed:", server, e.message);
       }
     }
-    if (!success) showToast("\u9053\u8DEF\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\uFF08\u5F8C\u3067\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\uFF09");
+    if (!success) showToast("\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\uFF08\u5F8C\u3067\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\uFF09");
     state_default.trailLoadActive = false;
     setTimeout(() => showLoading(false), 300);
   }

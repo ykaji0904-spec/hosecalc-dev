@@ -23,6 +23,12 @@ function addEdge(from, to, dist) {
 
 export async function loadTrails() {
     if (S.trailLoadActive) return;
+    // 既にグラフが構築済みならAPIフェッチをスキップ
+    if (trailGraph.nodes.size > 0) {
+        S.trailEntities.forEach(e => e.show = S.layers.trails);
+        if (S.traceGuideActive) import('./trace.js').then(m => m.updateTraceGuide());
+        return;
+    }
     const c = S.viewer.camera.positionCartographic;
     const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
     const radius = TRAIL_RADIUS;

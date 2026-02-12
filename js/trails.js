@@ -97,6 +97,8 @@ export async function loadTrails() {
             if (ways.length > 0) showToast(`登山道 ${ways.length}本（${trailGraph.nodes.size}ノード）`);
             else showToast('この範囲に登山道データがありません');
             success = true;
+            // トレースガイド更新
+            if (S.traceGuideActive) import('./trace.js').then(m => m.updateTraceGuide());
         } catch (e) { console.log('Trail server failed:', server, e.message); }
     }
 

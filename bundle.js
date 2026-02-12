@@ -225,9 +225,11 @@ var HoseCalc = (() => {
         </div>
         <div class="guide-steps">
             ${steps.map((s, i) => `
-                <div class="guide-step ${s.done ? "done" : ""} ${s.active ? "active" : ""}">
+                <div class="guide-step ${s.done ? "done" : ""} ${s.active ? "active" : ""}"
+                     ${s.action ? `onclick="${s.action}" style="cursor:pointer"` : ""}>
                     <span class="guide-num">${s.done ? "\u2713" : i + 1}</span>
                     <span class="guide-label">${s.label}</span>
+                    ${s.active && s.action ? '<span class="material-icons" style="font-size:14px;margin-left:2px">touch_app</span>' : ""}
                 </div>
             `).join('<div class="guide-arrow">\u2192</div>')}
         </div>
@@ -661,9 +663,9 @@ var HoseCalc = (() => {
       return;
     }
     showGuideBanner([
-      { label: "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3080", done: hasTrails, active: !hasTrails },
-      { label: "\u6C34\u5229\u3092\u767B\u9332", done: hasWater, active: hasTrails && !hasWater },
-      { label: "\u706B\u70B9\u3092\u767B\u9332", done: hasFire, active: hasTrails && hasWater && !hasFire },
+      { label: "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3080", done: hasTrails, active: !hasTrails, action: !hasTrails ? "toggleMapLayer('trails')" : null },
+      { label: "\u6C34\u5229\u3092\u767B\u9332", done: hasWater, active: hasTrails && !hasWater, action: hasTrails && !hasWater ? "setOperation('water')" : null },
+      { label: "\u706B\u70B9\u3092\u767B\u9332", done: hasFire, active: hasTrails && hasWater && !hasFire, action: hasTrails && hasWater && !hasFire ? "setOperation('fire')" : null },
       { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
     ]);
   }
@@ -1286,6 +1288,23 @@ var HoseCalc = (() => {
     document.getElementById("waterLon").textContent = w.lon.toFixed(6) + "\xB0";
     document.getElementById("waterPanel").classList.add("active");
   }
+  function deleteSelectedWater() {
+    if (!state_default.selectedWater) return;
+    const id = state_default.selectedWater.id;
+    const dataIdx = state_default.waterSources.findIndex((s) => s.id === id);
+    if (dataIdx >= 0) state_default.waterSources.splice(dataIdx, 1);
+    const entityIdx = state_default.waterEntities.findIndex((e) => e.id === id);
+    if (entityIdx >= 0) {
+      state_default.viewer.entities.remove(state_default.waterEntities[entityIdx]);
+      state_default.waterEntities.splice(entityIdx, 1);
+    } else {
+      const entity = state_default.viewer.entities.getById(id);
+      if (entity) state_default.viewer.entities.remove(entity);
+    }
+    document.getElementById("waterPanel").classList.remove("active");
+    state_default.selectedWater = null;
+    saveAllData();
+  }
   function showWaterPicker(x, y) {
     const picker = document.getElementById("waterPicker");
     picker.style.left = Math.min(x, window.innerWidth - 200) + "px";
@@ -1753,6 +1772,7 @@ var HoseCalc = (() => {
     closeInfoModal,
     hideGuideBanner,
     deleteSelectedFire,
+    deleteSelectedWater,
     confirmWaterType,
     undoHosePoint,
     resetHoseLine,

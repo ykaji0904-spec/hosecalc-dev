@@ -3,9 +3,12 @@ import { CESIUM_TOKEN, DEFAULT_POSITION, GSI_TILE_URL, HAZARD_URLS } from './con
 import { updateLayerCards, showToast } from './ui.js';
 
 export function initViewer() {
+    console.log('[HoseCalc:map] Setting Cesium Ion token...');
     Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
 
+    console.log('[HoseCalc:map] Creating Viewer...');
     try {
+        // まずCesium Ion衛星画像で試行
         S.viewer = new Cesium.Viewer('cesiumContainer', {
             imageryProvider: new Cesium.IonImageryProvider({ assetId: 2 }),
             terrainProvider: Cesium.createWorldTerrain({ requestWaterMask: false, requestVertexNormals: false }),
@@ -14,31 +17,52 @@ export function initViewer() {
             infoBox: false, selectionIndicator: false,
             requestRenderMode: false, msaaSamples: 1
         });
-    } catch (e) {
-        console.error('Cesium Viewer init failed:', e);
-        return null;
+        console.log('[HoseCalc:map] Viewer created with Ion imagery');
+    } catch (e1) {
+        console.warn('[HoseCalc:map] Ion imagery failed, trying OSM fallback:', e1.message);
+        try {
+            // フォールバック: OSMタイルで生成
+            S.viewer = new Cesium.Viewer('cesiumContainer', {
+                imageryProvider: new Cesium.UrlTemplateImageryProvider({
+                    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    maximumLevel: 19,
+                    credit: '© OpenStreetMap contributors'
+                }),
+                terrainProvider: Cesium.createWorldTerrain({ requestWaterMask: false, requestVertexNormals: false }),
+                baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+                navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
+                infoBox: false, selectionIndicator: false,
+                requestRenderMode: false, msaaSamples: 1
+            });
+            console.log('[HoseCalc:map] Viewer created with OSM fallback');
+        } catch (e2) {
+            console.error('[HoseCalc:map] All viewer creation failed:', e2.message);
+            return null;
+        }
     }
 
     const v = S.viewer;
+    if (!v) return null;
 
-    // Globe rendering settings - PCの大画面でも素早くタイルを表示
+    // Globe settings
     v.scene.globe.tileCacheSize = 1000;
-    v.scene.globe.maximumScreenSpaceError = 4; // PC: 2は厳しすぎる→4で高速化
+    v.scene.globe.maximumScreenSpaceError = 4;
     v.scene.fog.enabled = false;
     v.scene.skyAtmosphere.show = false;
     v.scene.globe.showGroundAtmosphere = false;
 
     // Camera controls
-    v.scene.screenSpaceCameraController.enableRotate = true;
-    v.scene.screenSpaceCameraController.enableTranslate = true;
-    v.scene.screenSpaceCameraController.enableZoom = true;
-    v.scene.screenSpaceCameraController.enableTilt = true;
-    v.scene.screenSpaceCameraController.enableLook = true;
-    v.scene.screenSpaceCameraController.inertiaSpin = 0.5;
-    v.scene.screenSpaceCameraController.inertiaTranslate = 0.5;
-    v.scene.screenSpaceCameraController.inertiaZoom = 0.5;
+    const ctrl = v.scene.screenSpaceCameraController;
+    ctrl.enableRotate = true;
+    ctrl.enableTranslate = true;
+    ctrl.enableZoom = true;
+    ctrl.enableTilt = true;
+    ctrl.enableLook = true;
+    ctrl.inertiaSpin = 0.5;
+    ctrl.inertiaTranslate = 0.5;
+    ctrl.inertiaZoom = 0.5;
 
-    // Initial camera position
+    // Initial camera
     v.camera.setView({
         destination: Cesium.Cartesian3.fromDegrees(DEFAULT_POSITION.lon, DEFAULT_POSITION.lat, DEFAULT_POSITION.height)
     });
@@ -50,28 +74,27 @@ export function initViewer() {
     );
     S.stdLayer.show = false;
 
-    // Force resize to ensure container dimensions are correct (ESModule defer fix)
+    // Force resize + render (ESModule timing fix)
     v.resize();
     v.scene.requestRender();
 
-    // Re-resize on window resize
-    window.addEventListener('resize', () => {
+    // Window resize handler
+    window.addEventListener('resize', () => { v.resize(); v.scene.requestRender(); });
+
+    // Periodic render kicks during initial load
+    let kicks = 0;
+    const kickInterval = setInterval(() => {
         v.resize();
         v.scene.requestRender();
-    });
-
-    // Force multiple render passes during initial tile load
-    let renderKicks = 0;
-    const renderInterval = setInterval(() => {
-        v.scene.requestRender();
-        renderKicks++;
-        if (renderKicks > 10) clearInterval(renderInterval);
-    }, 500);
+        kicks++;
+        if (kicks > 15) clearInterval(kickInterval);
+    }, 300);
 
     // Scale bar
     v.camera.moveEnd.addEventListener(updateScaleBar);
     setTimeout(updateScaleBar, 3000);
 
+    console.log('[HoseCalc:map] initViewer complete, canvas:', v.canvas.width, 'x', v.canvas.height);
     return v;
 }
 
@@ -177,7 +200,7 @@ function updateScaleBar() {
     try {
         const v = S.viewer;
         const width = v.canvas.clientWidth;
-        if (width === 0) return; // Container not yet sized
+        if (width === 0) return;
         const left = v.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.3, v.canvas.clientHeight / 2));
         const right = v.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.7, v.canvas.clientHeight / 2));
         if (!left || !right) return;

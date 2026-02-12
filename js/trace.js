@@ -21,11 +21,15 @@ export function updateTraceGuide() {
     ]);
 
     if (hasTrails && hasWater && hasFire) {
-        // 全条件クリア → 自動実行
+        // 全条件クリア → 実行ボタン表示
         S.traceGuideActive = false;
-        hideGuideBanner();
         clearTool();
-        setTimeout(() => executeTrace(), 300);
+        showGuideBanner([
+            { label: '登山道', done: true },
+            { label: '水利', done: true },
+            { label: '火点', done: true },
+            { label: 'トレース実行', done: false, active: true, action: '_execTrace()' }
+        ]);
         return;
     }
 
@@ -56,14 +60,21 @@ function activateTool(tool, icon, label, modeClass, hintText) {
 // トレースボタン押下 — エントリーポイント
 export async function traceTrailRoute() {
     closeSidePanel();
+    // 既存のホース操作をクリア
+    clearTool();
 
     const hasTrails = trailGraph.nodes.size > 0;
     const hasWater = S.waterSources.length > 0;
     const hasFire = S.firePoints.length > 0;
 
     if (hasTrails && hasWater && hasFire) {
-        // 全部揃っている → 即実行
-        await executeTrace();
+        // 全部揃っている → ガイドに「実行」ボタンを表示
+        showGuideBanner([
+            { label: '登山道', done: true },
+            { label: '水利', done: true },
+            { label: '火点', done: true },
+            { label: 'トレース実行', done: false, active: true, action: '_execTrace()' }
+        ]);
         return;
     }
 
@@ -71,7 +82,6 @@ export async function traceTrailRoute() {
     S.traceGuideActive = true;
 
     if (!hasTrails) {
-        // 登山道を自動で読み込み開始
         if (!S.layers.trails) {
             toggleMapLayer('trails');
         }
@@ -82,24 +92,28 @@ export async function traceTrailRoute() {
             { label: 'トレース実行', done: false, active: false }
         ]);
     } else if (!hasWater) {
-        // 水利モードに切替
         activateTool('water', 'water_drop', '水利を地図にタップ', 'water-mode', '水源の位置（消火栓・防火水槽など）をタップ');
         showGuideBanner([
-            { label: '登山道読み込み', done: true, active: false },
+            { label: '登山道', done: true, active: false },
             { label: '水利を地図にタップ', done: false, active: true },
             { label: '火点を地図にタップ', done: hasFire, active: false },
             { label: 'トレース実行', done: false, active: false }
         ]);
     } else {
-        // 火点モードに切替
         activateTool('fire', 'local_fire_department', '火点を地図にタップ', '', '火災地点をタップ');
         showGuideBanner([
-            { label: '登山道読み込み', done: true, active: false },
-            { label: '水利を地図にタップ', done: true, active: false },
+            { label: '登山道', done: true, active: false },
+            { label: '水利', done: true, active: false },
             { label: '火点を地図にタップ', done: false, active: true },
             { label: 'トレース実行', done: false, active: false }
         ]);
     }
+}
+
+// window公開用ラッパー
+export async function execTrace() {
+    hideGuideBanner();
+    await executeTrace();
 }
 
 // 実際のトレース処理

@@ -146,7 +146,6 @@ export function closeInfoModal() {
 
 // ガイドバナー
 export function showGuideBanner(steps) {
-    // steps: [{label, done, active, action}]
     let el = document.getElementById('guideBanner');
     if (!el) {
         el = document.createElement('div');
@@ -161,11 +160,9 @@ export function showGuideBanner(steps) {
         </div>
         <div class="guide-steps">
             ${steps.map((s, i) => `
-                <div class="guide-step ${s.done ? 'done' : ''} ${s.active ? 'active' : ''}"
-                     ${s.action ? `onclick="${s.action}" style="cursor:pointer"` : ''}>
+                <div class="guide-step ${s.done ? 'done' : ''} ${s.active ? 'active' : ''}">
                     <span class="guide-num">${s.done ? '✓' : i + 1}</span>
                     <span class="guide-label">${s.label}</span>
-                    ${s.active && s.action ? '<span class="material-icons" style="font-size:14px;margin-left:2px">touch_app</span>' : ''}
                 </div>
             `).join('<div class="guide-arrow">→</div>')}
         </div>

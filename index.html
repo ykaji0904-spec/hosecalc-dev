@@ -25,8 +25,9 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Noto Sans JP',sans-serif;overflow:hidden;background:#000}
-        #cesiumContainer{width:100vw;height:100vh}
+        html{width:100%;height:100%}
+        body{font-family:'Noto Sans JP',sans-serif;overflow:hidden;background:#000;width:100%;height:100%;margin:0;padding:0}
+        #cesiumContainer{width:100%;height:100%}
         .top-bar{position:fixed;top:0;left:0;right:0;height:52px;background:rgba(15,15,15,0.95);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1000}
         .logo{display:flex;align-items:center;gap:10px}
         .logo-icon{width:36px;height:36px;background:linear-gradient(135deg,#ff6b35,#f7931e);border-radius:10px;display:flex;align-items:center;justify-content:center}
@@ -248,7 +249,7 @@
         <div class="map-type-switch"><button class="map-type-btn active" id="mapBtnSatellite" onclick="setBasemap('satellite')"><span class="material-icons">satellite_alt</span><span>衛星</span></button><button class="map-type-btn" id="mapBtnStd" onclick="setBasemap('std')"><span class="material-icons">map</span><span>地図</span></button></div>
         <button class="menu-btn" onclick="openSidePanel()"><span class="material-icons">menu</span></button>
     </div>
-    <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay show" id="loadingOverlay">
         <div class="loading-icon">🔥</div>
         <div class="loading-spinner"></div>
         <div class="loading-content">

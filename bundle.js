@@ -234,7 +234,7 @@ var HoseCalc = (() => {
       INFO_CONTENT = {
         about: {
           title: "HoseCalc\u306B\u3064\u3044\u3066",
-          html: '<h3>\u6982\u8981</h3><p>\u6797\u91CE\u706B\u707D\u306A\u3069\u306E\u969B\u306B\u30DB\u30FC\u30B9\u5EF6\u9577\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u3092\u884C\u3046\u30D7\u30E9\u30C3\u30C8\u30D5\u30A9\u30FC\u30E0\u3067\u3059\u3002</p><h3>\u4E3B\u306A\u6A5F\u80FD</h3><p>\u30FB\u30EA\u30A2\u30EB\u306A\u5730\u5F62\u30C7\u30FC\u30BF\u3092\u4F7F\u3063\u305F\u30DB\u30FC\u30B9\u5EF6\u9577\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3<br>\u30FB\u5727\u529B\u640D\u5931\u3068\u4E2D\u7D99\u30DD\u30F3\u30D7\u4F4D\u7F6E\u306E\u81EA\u52D5\u8A08\u7B97<br>\u30FB\u706B\u70B9\u30FB\u6C34\u5229\u30DD\u30A4\u30F3\u30C8\u306E\u767B\u9332\u3068\u7BA1\u7406<br>\u30FB\u6D2A\u6C34\u30FB\u6D25\u6CE2\u30FB\u571F\u7802\u707D\u5BB3\u30CF\u30B6\u30FC\u30C9\u30DE\u30C3\u30D7\u306E\u91CD\u7573\u8868\u793A<br>\u30FB\u767B\u5C71\u9053\u306E\u8868\u793A</p><h3>\u5BFE\u8C61\u30E6\u30FC\u30B6\u30FC</h3><p>\u6D88\u9632\u8077\u54E1\u30FB\u6D88\u9632\u56E3\u54E1\u30FB\u305D\u306E\u4ED6\u9632\u707D\u95A2\u4FC2\u8005</p><p style="color:rgba(255,255,255,0.4);margin-top:16px">\u958B\u767A: Y.K.</p>'
+          html: '<h3>\u6982\u8981</h3><p>\u6797\u91CE\u706B\u707D\u306A\u3069\u306E\u969B\u306B\u30DB\u30FC\u30B9\u5EF6\u9577\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u3092\u884C\u3046\u30D7\u30E9\u30C3\u30C8\u30D5\u30A9\u30FC\u30E0\u3067\u3059\u3002</p><h3>\u4E3B\u306A\u6A5F\u80FD</h3><p>\u30FB\u30EA\u30A2\u30EB\u306A\u5730\u5F62\u30C7\u30FC\u30BF\u3092\u4F7F\u3063\u305F\u30DB\u30FC\u30B9\u5EF6\u9577\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3<br>\u30FB\u5727\u529B\u640D\u5931\u3068\u4E2D\u7D99\u30DD\u30F3\u30D7\u4F4D\u7F6E\u306E\u81EA\u52D5\u8A08\u7B97<br>\u30FB\u706B\u70B9\u30FB\u6C34\u5229\u30DD\u30A4\u30F3\u30C8\u306E\u767B\u9332\u3068\u7BA1\u7406<br>\u30FB\u6D2A\u6C34\u30FB\u6D25\u6CE2\u30FB\u571F\u7802\u707D\u5BB3\u30CF\u30B6\u30FC\u30C9\u30DE\u30C3\u30D7\u306E\u91CD\u7573\u8868\u793A<br>\u30FB\u767B\u5C71\u9053\u30FB\u4E00\u822C\u9053\u8DEF\u306E\u8868\u793A\u3068\u30EB\u30FC\u30C8\u30C8\u30EC\u30FC\u30B9</p><h3>\u5BFE\u8C61\u30E6\u30FC\u30B6\u30FC</h3><p>\u6D88\u9632\u8077\u54E1\u30FB\u6D88\u9632\u56E3\u54E1\u30FB\u305D\u306E\u4ED6\u9632\u707D\u95A2\u4FC2\u8005</p><p style="color:rgba(255,255,255,0.4);margin-top:16px">\u958B\u767A: Y.K.</p>'
         },
         usage: {
           title: "\u4F7F\u3044\u65B9",
@@ -246,7 +246,7 @@ var HoseCalc = (() => {
         },
         source: {
           title: "\u30C7\u30FC\u30BF\u30BD\u30FC\u30B9",
-          html: '<div class="param-row"><span class="param-label">\u885B\u661F\u753B\u50CF</span><span class="param-value">Cesium Ion</span></div><div class="param-row"><span class="param-label">\u5730\u5F62</span><span class="param-value">Cesium World Terrain</span></div><div class="param-row"><span class="param-label">\u6A19\u6E96\u5730\u56F3</span><span class="param-value">\u56FD\u571F\u5730\u7406\u9662</span></div><div class="param-row"><span class="param-label">\u767B\u5C71\u9053</span><span class="param-value">OpenStreetMap</span></div><div class="param-row"><span class="param-label">\u30CF\u30B6\u30FC\u30C9\u30DE\u30C3\u30D7</span><span class="param-value">\u56FD\u571F\u4EA4\u901A\u7701</span></div>'
+          html: '<div class="param-row"><span class="param-label">\u885B\u661F\u753B\u50CF</span><span class="param-value">Cesium Ion</span></div><div class="param-row"><span class="param-label">\u5730\u5F62</span><span class="param-value">Cesium World Terrain</span></div><div class="param-row"><span class="param-label">\u6A19\u6E96\u5730\u56F3</span><span class="param-value">\u56FD\u571F\u5730\u7406\u9662</span></div><div class="param-row"><span class="param-label">\u9053\u8DEF\u30C7\u30FC\u30BF</span><span class="param-value">OpenStreetMap</span></div><div class="param-row"><span class="param-label">\u30CF\u30B6\u30FC\u30C9\u30DE\u30C3\u30D7</span><span class="param-value">\u56FD\u571F\u4EA4\u901A\u7701</span></div>'
         }
       };
     }
@@ -685,7 +685,7 @@ var HoseCalc = (() => {
     if (!hasTrails) {
       state_default.traceGuideStep = "trails";
       if (!state_default.layers.trails) toggleMapLayer("trails");
-      showStepBanner("hiking", "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
+      showStepBanner("hiking", "\u9053\u8DEF\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
     } else {
       goToFireStep();
     }
@@ -773,12 +773,12 @@ var HoseCalc = (() => {
     const nearFire = findNearestNode(fire.lon, fire.lat, 1e3);
     if (!nearWater) {
       showLoading(false);
-      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u9053\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
       return;
     }
     if (!nearFire) {
       showLoading(false);
-      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u9053\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
       return;
     }
     showLoading(true, "\u30C0\u30A4\u30AF\u30B9\u30C8\u30E9\u63A2\u7D22\u4E2D...", 40);
@@ -817,7 +817,7 @@ var HoseCalc = (() => {
     }
     showLoading(false);
     const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
-    showToast(`\u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
+    showToast(`\u30EB\u30FC\u30C8\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
     state_default.traceFire = null;
     state_default.traceWater = null;
     state_default.viewer.scene.requestRender();
@@ -876,16 +876,17 @@ var HoseCalc = (() => {
     const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
     const radius = TRAIL_RADIUS;
     state_default.trailLoadActive = true;
-    showLoading(true, "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D...", 30);
+    showLoading(true, "\u9053\u8DEF\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D...", 30);
     let success = false;
     for (const server of OVERPASS_SERVERS) {
       if (success) break;
       try {
         const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
-        const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
+        const hwTypes = "path|track|footway|residential|unclassified|tertiary|secondary|service|living_street|pedestrian";
+        const query = `[out:json][timeout:60];(way["highway"~"^(${hwTypes})$"](${bbox}););out geom qt;`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25e3);
-        showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...", 50);
+        const timeoutId = setTimeout(() => controller.abort(), 55e3);
+        showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...\uFF08\u9053\u8DEF\u30C7\u30FC\u30BF\u53D6\u5F97\uFF09", 50);
         const res = await fetch(server, {
           method: "POST",
           body: "data=" + encodeURIComponent(query),
@@ -947,7 +948,7 @@ var HoseCalc = (() => {
             }
           }
         }
-        showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
+        showLoading(true, `${ways.length}\u672C\u306E\u9053\u8DEF\u3092\u63CF\u753B\u4E2D...`, 85);
         ways.forEach((way) => {
           if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
           const pos = way.geometry.map((g) => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
@@ -961,15 +962,15 @@ var HoseCalc = (() => {
         state_default.viewer.scene.requestRender();
         showLoading(true, "\u5B8C\u4E86", 100);
         console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(\u226425m)`);
-        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
-        else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
+        if (ways.length > 0) showToast(`\u9053\u8DEF ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
+        else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u9053\u8DEF\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
         success = true;
         if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
       } catch (e) {
         console.log("Trail server failed:", server, e.message);
       }
     }
-    if (!success) showToast("\u767B\u5C71\u9053\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\uFF08\u5F8C\u3067\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\uFF09");
+    if (!success) showToast("\u9053\u8DEF\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\uFF08\u5F8C\u3067\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\uFF09");
     state_default.trailLoadActive = false;
     setTimeout(() => showLoading(false), 300);
   }

@@ -71,7 +71,7 @@ export function updateCredit() {
 
 export function setViewMode(mode) {
     document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    event.target.closest('.view-btn').classList.add('active');
+    document.querySelector(`.view-btn[onclick*="${mode}"]`).classList.add('active');
     S.viewer.scene.mode = mode === '2d' ? Cesium.SceneMode.SCENE2D : Cesium.SceneMode.SCENE3D;
 }
 

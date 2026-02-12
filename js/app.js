@@ -9,7 +9,7 @@ import { doSearch, flyToSearch } from './search.js';
 import { saveAllData, loadAllData, clearStoredData } from './storage.js';
 import { shareSimulation, restoreFromURL } from './share.js';
 import { initEventHandlers } from './events.js';
-import { traceTrailRoute } from './trace.js';
+import { traceTrailRoute, execTrace } from './trace.js';
 
 // === Global error handler (PC問題診断用) ===
 window.onerror = function(msg, url, line, col, err) {
@@ -95,7 +95,7 @@ Object.assign(window, {
     undoHosePoint, resetHoseLine, closeHosePanel, confirmHoseLine, deleteSelectedHose, onParamChange,
     resetMeasure, closeMeasurePanel,
     doSearch, _flyToSearch: flyToSearch,
-    setOperation, clearAllDataConfirm, shareSimulation, traceTrailRoute
+    setOperation, clearAllDataConfirm, shareSimulation, traceTrailRoute, _execTrace: execTrace
 });
 
 // === Boot ===

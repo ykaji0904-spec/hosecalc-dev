@@ -21,7 +21,10 @@ const S = {
     measurePoints: [], measureMarkers: [], measureLine: null,
     lastClickedCoords: null, longPressTimer: null, longPressStartPos: null,
     isRestoring: false,
-    traceGuideActive: false
+    traceGuideActive: false,
+    traceGuideStep: null,   // 'trails' | 'fire' | 'water' | null
+    traceFire: null,        // このトレース用の火点 {lon,lat,height}
+    traceWater: null,       // このトレース用の水利 {lon,lat}
 };
 
 export default S;

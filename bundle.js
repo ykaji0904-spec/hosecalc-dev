@@ -867,6 +867,11 @@ var HoseCalc = (() => {
   }
   async function loadTrails() {
     if (state_default.trailLoadActive) return;
+    if (trailGraph.nodes.size > 0) {
+      state_default.trailEntities.forEach((e) => e.show = state_default.layers.trails);
+      if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
+      return;
+    }
     const c = state_default.viewer.camera.positionCartographic;
     const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
     const radius = TRAIL_RADIUS;

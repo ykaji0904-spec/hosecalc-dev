@@ -40,9 +40,9 @@ function setOperation(op) {
 function clearAllDataConfirm() {
     closeSidePanel();
     if (!confirm('全てのデータ（火点・水利・ホースライン）を削除しますか？')) return;
-    S.firePoints.forEach((_, i) => S.viewer.entities.remove(S.firePointEntities[i]));
+    S.firePointEntities.forEach(e => S.viewer.entities.remove(e));
     S.firePoints = []; S.firePointEntities = []; S.selectedFirePoint = null;
-    S.waterSources.forEach((_, i) => S.viewer.entities.remove(S.waterEntities[i]));
+    S.waterEntities.forEach(e => S.viewer.entities.remove(e));
     S.waterSources = []; S.waterEntities = []; S.selectedWater = null;
     S.confirmedLines.forEach(l => clearSimulationVisuals(l.id));
     S.confirmedLines = []; S.selectedHoseLine = null;

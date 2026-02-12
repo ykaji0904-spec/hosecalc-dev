@@ -664,10 +664,14 @@ var HoseCalc = (() => {
     const ic = document.getElementById("modeIcon");
     const tx = document.getElementById("modeText");
     const ht = document.getElementById("modeHint");
-    ic.textContent = iconName;
-    tx.textContent = label;
-    if (ht) ht.textContent = hintText || "";
-    ind.className = "mode-indicator show " + modeClass;
+    if (state_default.traceGuideActive) {
+      ind.className = "mode-indicator";
+    } else {
+      ic.textContent = iconName;
+      tx.textContent = label;
+      if (ht) ht.textContent = hintText || "";
+      ind.className = "mode-indicator show " + modeClass;
+    }
     updateLayerCards();
   }
   async function traceTrailRoute() {
@@ -872,7 +876,7 @@ var HoseCalc = (() => {
       if (success) break;
       try {
         const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
-        const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out body;>;out skel qt;`;
+        const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25e3);
         showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...", 50);
@@ -887,36 +891,34 @@ var HoseCalc = (() => {
         showLoading(true, "\u30C7\u30FC\u30BF\u3092\u51E6\u7406\u4E2D...", 70);
         const data = await res.json();
         if (!data.elements) continue;
-        const nodes = /* @__PURE__ */ new Map();
-        data.elements.forEach((e) => {
-          if (e.type === "node") nodes.set(e.id, [e.lon, e.lat]);
-        });
-        const ways = data.elements.filter((e) => e.type === "way");
+        const ways = data.elements.filter((e) => e.type === "way" && e.geometry);
         let newNodes = 0, newEdges = 0;
         const wayEndpoints = [];
         ways.forEach((way) => {
-          const wayNodes = way.nodes.filter((nid) => nodes.has(nid));
-          for (let i = 0; i < wayNodes.length; i++) {
-            const nid = wayNodes[i];
+          const geom = way.geometry;
+          const nodeIds = way.nodes || [];
+          for (let i = 0; i < geom.length; i++) {
+            const nid = nodeIds[i] || `${way.id}-${i}`;
+            const { lon: lon2, lat: lat2 } = geom[i];
             if (!trailGraph.nodes.has(nid)) {
-              const [lon2, lat2] = nodes.get(nid);
               trailGraph.nodes.set(nid, { lon: lon2, lat: lat2 });
               newNodes++;
             }
             if (i > 0) {
-              const prev = wayNodes[i - 1];
-              const [lon1, lat1] = nodes.get(prev);
-              const [lon2, lat2] = nodes.get(nid);
+              const prev = nodeIds[i - 1] || `${way.id}-${i - 1}`;
               const existing = trailGraph.edges.get(prev);
               if (!existing || !existing.some((e) => e.to === nid)) {
-                const dist = haversineDistance(lon1, lat1, lon2, lat2);
+                const dist = haversineDistance(geom[i - 1].lon, geom[i - 1].lat, lon2, lat2);
                 addEdge(prev, nid, dist);
                 newEdges++;
               }
             }
           }
-          if (wayNodes.length >= 2) {
-            wayEndpoints.push(wayNodes[0], wayNodes[wayNodes.length - 1]);
+          if (geom.length >= 2) {
+            wayEndpoints.push(
+              nodeIds[0] || `${way.id}-0`,
+              nodeIds[geom.length - 1] || `${way.id}-${geom.length - 1}`
+            );
           }
         });
         const BRIDGE_MAX_M = 25;
@@ -942,10 +944,7 @@ var HoseCalc = (() => {
         showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
         ways.forEach((way) => {
           if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
-          const pos = way.nodes.filter((nid) => nodes.has(nid)).map((nid) => {
-            const n = nodes.get(nid);
-            return Cesium.Cartesian3.fromDegrees(n[0], n[1]);
-          });
+          const pos = way.geometry.map((g) => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
           if (pos.length >= 2) {
             const e = state_default.viewer.entities.add({ polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true } });
             e.show = state_default.layers.trails;
@@ -1868,6 +1867,36 @@ var HoseCalc = (() => {
       state_default.isRestoring = false;
     }
   }
+  function clearSimResults() {
+    if (!confirm("\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u7D50\u679C\uFF08\u30DB\u30FC\u30B9\u30E9\u30A4\u30F3\uFF09\u3092\u3059\u3079\u3066\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F")) return;
+    state_default.confirmedLines.forEach((l) => clearSimulationVisuals(l.id));
+    state_default.confirmedLines = [];
+    resetHoseLine();
+    document.getElementById("hosePanel").classList.remove("active");
+    document.getElementById("hoseInfoPanel").classList.remove("active");
+    state_default.selectedHoseLine = null;
+    clearTool();
+    saveAllData();
+    state_default.viewer.scene.requestRender();
+    showToast("\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u7D50\u679C\u3092\u30AF\u30EA\u30A2\u3057\u307E\u3057\u305F");
+  }
+  function clearAllPoints() {
+    if (!confirm("\u706B\u70B9\u30FB\u6C34\u5229\u3092\u3059\u3079\u3066\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F")) return;
+    state_default.firePointEntities.forEach((e) => state_default.viewer.entities.remove(e));
+    state_default.firePoints = [];
+    state_default.firePointEntities = [];
+    state_default.selectedFirePoint = null;
+    document.getElementById("firePanel").classList.remove("active");
+    state_default.waterEntities.forEach((e) => state_default.viewer.entities.remove(e));
+    state_default.waterSources = [];
+    state_default.waterEntities = [];
+    state_default.selectedWater = null;
+    document.getElementById("waterPanel").classList.remove("active");
+    clearTool();
+    saveAllData();
+    state_default.viewer.scene.requestRender();
+    showToast("\u706B\u70B9\u30FB\u6C34\u5229\u3092\u3059\u3079\u3066\u524A\u9664\u3057\u307E\u3057\u305F");
+  }
   Object.assign(window, {
     setBasemap,
     setViewMode,
@@ -1902,7 +1931,9 @@ var HoseCalc = (() => {
     clearAllDataConfirm,
     shareSimulation,
     traceTrailRoute,
-    _execTrace: execTrace
+    _execTrace: execTrace,
+    clearSimResults,
+    clearAllPoints
   });
   function boot() {
     console.log("[HoseCalc] Boot: starting...");

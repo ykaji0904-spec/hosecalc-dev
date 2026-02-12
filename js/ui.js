@@ -42,6 +42,8 @@ export function updateLayerCards() {
 export function clearTool() {
     S.currentTool = null;
     document.getElementById('modeIndicator').className = 'mode-indicator';
+    const hint = document.getElementById('modeHint');
+    if (hint) hint.textContent = '';
     document.getElementById('hosePanel').classList.remove('active');
     document.getElementById('measurePanel').classList.remove('active');
 }

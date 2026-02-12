@@ -668,19 +668,21 @@ var HoseCalc = (() => {
       return;
     }
     if (hasTrails && !hasWater) {
-      activateTool("water", "water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "water-mode");
+      activateTool("water", "water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "water-mode", "\u6C34\u6E90\u306E\u4F4D\u7F6E\uFF08\u6D88\u706B\u6813\u30FB\u9632\u706B\u6C34\u69FD\u306A\u3069\uFF09\u3092\u30BF\u30C3\u30D7");
     } else if (hasTrails && hasWater && !hasFire) {
-      activateTool("fire", "local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "");
+      activateTool("fire", "local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "", "\u706B\u707D\u5730\u70B9\u3092\u30BF\u30C3\u30D7");
     }
   }
-  function activateTool(tool, icon, label, modeClass) {
+  function activateTool(tool, icon, label, modeClass, hintText) {
     clearTool();
     state_default.currentTool = tool;
     const ind = document.getElementById("modeIndicator");
     const ic = document.getElementById("modeIcon");
     const tx = document.getElementById("modeText");
+    const ht = document.getElementById("modeHint");
     ic.textContent = icon;
     tx.textContent = label;
+    if (ht) ht.textContent = hintText || "";
     ind.className = "mode-indicator show " + modeClass;
     updateLayerCards();
   }
@@ -705,7 +707,7 @@ var HoseCalc = (() => {
         { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
       ]);
     } else if (!hasWater) {
-      activateTool("water", "water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "water-mode");
+      activateTool("water", "water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "water-mode", "\u6C34\u6E90\u306E\u4F4D\u7F6E\uFF08\u6D88\u706B\u6813\u30FB\u9632\u706B\u6C34\u69FD\u306A\u3069\uFF09\u3092\u30BF\u30C3\u30D7");
       showGuideBanner([
         { label: "\u767B\u5C71\u9053\u8AAD\u307F\u8FBC\u307F", done: true, active: false },
         { label: "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: false, active: true },
@@ -713,7 +715,7 @@ var HoseCalc = (() => {
         { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
       ]);
     } else {
-      activateTool("fire", "local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "");
+      activateTool("fire", "local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "", "\u706B\u707D\u5730\u70B9\u3092\u30BF\u30C3\u30D7");
       showGuideBanner([
         { label: "\u767B\u5C71\u9053\u8AAD\u307F\u8FBC\u307F", done: true, active: false },
         { label: "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: true, active: false },
@@ -1749,25 +1751,29 @@ var HoseCalc = (() => {
     }
     clearTool();
     state_default.currentTool = op;
-    const ind = document.getElementById("modeIndicator"), icon = document.getElementById("modeIcon"), text = document.getElementById("modeText");
+    const ind = document.getElementById("modeIndicator"), icon = document.getElementById("modeIcon"), text = document.getElementById("modeText"), hint = document.getElementById("modeHint");
     if (op === "fire") {
       icon.textContent = "local_fire_department";
       text.textContent = "\u706B\u70B9\u8FFD\u52A0";
       ind.className = "mode-indicator show";
+      hint.textContent = "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u706B\u707D\u5730\u70B9\u3092\u767B\u9332";
     } else if (op === "water") {
       icon.textContent = "water_drop";
       text.textContent = "\u6C34\u5229\u8FFD\u52A0";
       ind.className = "mode-indicator show water-mode";
+      hint.textContent = "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u5229\uFF08\u6D88\u706B\u6813\u30FB\u9632\u706B\u6C34\u69FD\u306A\u3069\uFF09\u3092\u767B\u9332";
     } else if (op === "hose") {
       icon.textContent = "route";
       text.textContent = "\u30DB\u30FC\u30B9\u5EF6\u9577";
       ind.className = "mode-indicator show hose-mode";
+      hint.textContent = "\u6C34\u5229\u2192\u706B\u70B9\u306E\u9806\u306B\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u30DB\u30FC\u30B9\u30EB\u30FC\u30C8\u3092\u4F5C\u6210";
       document.getElementById("hosePanel").classList.add("active");
       resetHoseLine();
     } else if (op === "measure") {
       icon.textContent = "straighten";
       text.textContent = "2\u70B9\u8A08\u6E2C";
       ind.className = "mode-indicator show measure-mode";
+      hint.textContent = "\u5730\u56F3\u4E0A\u306E2\u70B9\u3092\u30BF\u30C3\u30D7\u3057\u3066\u8DDD\u96E2\u3068\u9AD8\u4F4E\u5DEE\u3092\u8A08\u6E2C";
       document.getElementById("measurePanel").classList.add("active");
       resetMeasure();
     }

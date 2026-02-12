@@ -95,7 +95,8 @@ var HoseCalc = (() => {
         lastClickedCoords: null,
         longPressTimer: null,
         longPressStartPos: null,
-        isRestoring: false
+        isRestoring: false,
+        traceGuideActive: false
       };
       state_default = S;
     }
@@ -236,6 +237,7 @@ var HoseCalc = (() => {
   function hideGuideBanner() {
     const el = document.getElementById("guideBanner");
     if (el) el.classList.remove("show");
+    state_default.traceGuideActive = false;
   }
   var INFO_CONTENT;
   var init_ui = __esm({
@@ -259,6 +261,504 @@ var HoseCalc = (() => {
           html: '<div class="param-row"><span class="param-label">\u885B\u661F\u753B\u50CF</span><span class="param-value">Cesium Ion</span></div><div class="param-row"><span class="param-label">\u5730\u5F62</span><span class="param-value">Cesium World Terrain</span></div><div class="param-row"><span class="param-label">\u6A19\u6E96\u5730\u56F3</span><span class="param-value">\u56FD\u571F\u5730\u7406\u9662</span></div><div class="param-row"><span class="param-label">\u767B\u5C71\u9053</span><span class="param-value">OpenStreetMap</span></div><div class="param-row"><span class="param-label">\u30CF\u30B6\u30FC\u30C9\u30DE\u30C3\u30D7</span><span class="param-value">\u56FD\u571F\u4EA4\u901A\u7701</span></div>'
         }
       };
+    }
+  });
+
+  // js/utils.js
+  function geodesicDistance(lon1, lat1, lon2, lat2) {
+    return new Cesium.EllipsoidGeodesic(
+      Cesium.Cartographic.fromDegrees(lon1, lat1),
+      Cesium.Cartographic.fromDegrees(lon2, lat2)
+    ).surfaceDistance;
+  }
+  function formatDistance(m) {
+    return m >= 1e3 ? (m / 1e3).toFixed(2) + "km" : m.toFixed(0) + "m";
+  }
+  function calcLossForDistance(dist, dh, params) {
+    const hoses = dist / params.hoseLengthM;
+    const frictionLoss = hoses * params.lossPerHoseMPa;
+    const elevLoss = dh * 0.01;
+    return frictionLoss + elevLoss;
+  }
+  function interpolatePath(points, interval) {
+    const result = [];
+    let cumulative = 0;
+    result.push({ ...points[0], distFromStart: 0 });
+    for (let i = 1; i < points.length; i++) {
+      const p1 = points[i - 1], p2 = points[i];
+      const segDist = geodesicDistance(p1.lon, p1.lat, p2.lon, p2.lat);
+      const segElev = (p2.height || 0) - (p1.height || 0);
+      const steps = Math.ceil(segDist / interval);
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        cumulative += segDist / steps;
+        result.push({
+          lon: p1.lon + (p2.lon - p1.lon) * t,
+          lat: p1.lat + (p2.lat - p1.lat) * t,
+          height: (p1.height || 0) + segElev * t,
+          distFromStart: cumulative
+        });
+      }
+    }
+    return result;
+  }
+  var init_utils = __esm({
+    "js/utils.js"() {
+      init_state();
+    }
+  });
+
+  // js/storage.js
+  function saveAllData() {
+    if (state_default.isRestoring) return;
+    try {
+      const data = {
+        firePoints: state_default.firePoints.map((p) => ({ id: p.id, lon: p.lon, lat: p.lat, height: p.height })),
+        waterSources: state_default.waterSources.map((w) => ({ id: w.id, type: w.type, name: w.name, lon: w.lon, lat: w.lat })),
+        confirmedLines: state_default.confirmedLines.map((l) => ({ id: l.id, points: l.points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height })) })),
+        counters: { fire: state_default.firePointIdCounter, water: state_default.waterIdCounter }
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn("Save failed:", e);
+    }
+  }
+  function loadAllData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn("Load failed:", e);
+      return null;
+    }
+  }
+  function clearStoredData() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  var STORAGE_KEY;
+  var init_storage = __esm({
+    "js/storage.js"() {
+      init_state();
+      STORAGE_KEY = "hosecalc_data";
+    }
+  });
+
+  // js/hose.js
+  function addHosePoint(lon, lat, height, cartesian) {
+    state_default.hosePoints.push({ lon, lat, height, cartesian });
+    const m = state_default.viewer.entities.add({
+      position: cartesian,
+      point: { pixelSize: 8, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 1, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }
+    });
+    state_default.hoseMarkers.push(m);
+    updateHoseLine();
+    updateHosePanel();
+    state_default.viewer.scene.requestRender();
+  }
+  function updateHoseLine() {
+    if (state_default.hoseLine) state_default.viewer.entities.remove(state_default.hoseLine);
+    state_default.hoseLine = null;
+    if (state_default.hosePoints.length >= 2) {
+      state_default.hoseLine = state_default.viewer.entities.add({
+        polyline: { positions: state_default.hosePoints.map((p) => p.cartesian), width: 4, material: Cesium.Color.ORANGE.withAlpha(0.9), clampToGround: true }
+      });
+    }
+  }
+  function updateHosePanel() {
+    if (state_default.hosePoints.length < 2) {
+      document.getElementById("hoseTotalDist").textContent = "0m";
+      document.getElementById("hoseTotalCount").textContent = "0\u672C";
+      document.getElementById("hoseElevInfo").textContent = "-";
+      return;
+    }
+    let totalDist = 0;
+    for (let i = 1; i < state_default.hosePoints.length; i++) {
+      totalDist += geodesicDistance(state_default.hosePoints[i - 1].lon, state_default.hosePoints[i - 1].lat, state_default.hosePoints[i].lon, state_default.hosePoints[i].lat);
+    }
+    const totalHose = Math.ceil(totalDist / 20);
+    const elevDiff = state_default.hosePoints[state_default.hosePoints.length - 1].height - state_default.hosePoints[0].height;
+    document.getElementById("hoseTotalDist").textContent = formatDistance(totalDist);
+    document.getElementById("hoseTotalCount").textContent = totalHose + "\u672C";
+    document.getElementById("hoseElevInfo").textContent = (elevDiff >= 0 ? "+" : "") + elevDiff.toFixed(0) + "m";
+  }
+  function undoHosePoint() {
+    if (state_default.hosePoints.length === 0) return;
+    state_default.hosePoints.pop();
+    if (state_default.hoseMarkers.length > 0) state_default.viewer.entities.remove(state_default.hoseMarkers.pop());
+    updateHoseLine();
+    updateHosePanel();
+    state_default.viewer.scene.requestRender();
+  }
+  function resetHoseLine() {
+    state_default.hosePoints = [];
+    state_default.hoseMarkers.forEach((m) => state_default.viewer.entities.remove(m));
+    state_default.hoseMarkers = [];
+    if (state_default.hoseLine) {
+      state_default.viewer.entities.remove(state_default.hoseLine);
+      state_default.hoseLine = null;
+    }
+    updateHosePanel();
+    document.getElementById("hoseHint").textContent = "\u9023\u7D9A\u30BF\u30C3\u30D7\u3067\u30DD\u30A4\u30F3\u30C8\u8FFD\u52A0";
+  }
+  function closeHosePanel() {
+    document.getElementById("hosePanel").classList.remove("active");
+    resetHoseLine();
+    clearTool();
+  }
+  function confirmHoseLine() {
+    if (state_default.hosePoints.length < 2) {
+      showToast("2\u70B9\u4EE5\u4E0A\u5FC5\u8981\u3067\u3059");
+      return;
+    }
+    const lineId = "hose-" + Date.now();
+    const pathLLH = state_default.hosePoints.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height }));
+    state_default.confirmedLines.push({ id: lineId, points: [...state_default.hosePoints].map((p) => ({ lon: p.lon, lat: p.lat, height: p.height })) });
+    if (state_default.hoseLine) state_default.viewer.entities.remove(state_default.hoseLine);
+    state_default.hoseLine = null;
+    state_default.hoseMarkers.forEach((m) => state_default.viewer.entities.remove(m));
+    state_default.hoseMarkers = [];
+    runSimulationForLine(lineId, pathLLH);
+    state_default.hosePoints = [];
+    document.getElementById("hosePanel").classList.remove("active");
+    document.getElementById("hoseInfoPanel").classList.add("active");
+    clearTool();
+    state_default.viewer.scene.requestRender();
+    saveAllData();
+    showToast("\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u5B8C\u4E86");
+  }
+  function selectHoseLine(id) {
+    const line = state_default.confirmedLines.find((l) => l.id === id);
+    if (!line) return;
+    closeAllPanels();
+    state_default.selectedHoseLine = id;
+    const pathLLH = line.points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height }));
+    runSimulationForLine(id, pathLLH);
+    document.getElementById("hoseInfoPanel").classList.add("active");
+  }
+  function deleteSelectedHose() {
+    if (!state_default.selectedHoseLine) return;
+    const idx = state_default.confirmedLines.findIndex((l) => l.id === state_default.selectedHoseLine);
+    if (idx >= 0) state_default.confirmedLines.splice(idx, 1);
+    clearSimulationVisuals(state_default.selectedHoseLine);
+    document.getElementById("hoseInfoPanel").classList.remove("active");
+    state_default.selectedHoseLine = null;
+    state_default.viewer.scene.requestRender();
+    saveAllData();
+  }
+  function onParamChange() {
+    if (state_default.selectedHoseLine) {
+      const line = state_default.confirmedLines.find((l) => l.id === state_default.selectedHoseLine);
+      if (line) runSimulationForLine(state_default.selectedHoseLine, line.points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height })));
+    }
+  }
+  function readParamsFromUI() {
+    state_default.hoseParams.pumpOutputMPa = parseFloat(document.getElementById("paramPumpOut").value) || 1.2;
+    state_default.hoseParams.relayOutputMPa = parseFloat(document.getElementById("paramRelayOut").value) || 0.8;
+    state_default.hoseParams.minInletPressureMPa = parseFloat(document.getElementById("paramInlet").value) || 0.15;
+    state_default.hoseParams.nozzleRequiredMPa = parseFloat(document.getElementById("paramNozzle").value) || 0.4;
+    state_default.hoseParams.lossPerHoseMPa = parseFloat(document.getElementById("paramLossPerHose").value) || 0.02;
+  }
+  function clearSimulationVisuals(lineId) {
+    const ss = state_default.hoseSimState;
+    (ss.markersByLineId.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
+    ss.markersByLineId.delete(lineId);
+    (ss.relayMarkersByLine.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
+    ss.relayMarkersByLine.delete(lineId);
+    (ss.colorizedLinesByLine.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
+    ss.colorizedLinesByLine.delete(lineId);
+    (ss.startEndMarkersByLine.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
+    ss.startEndMarkersByLine.delete(lineId);
+  }
+  function computeRelayPositions(interpolated, params) {
+    const relays = [];
+    let currentPressure = params.pumpOutputMPa;
+    let lastRelayIdx = 0;
+    for (let i = 1; i < interpolated.length; i++) {
+      const dist = interpolated[i].distFromStart - interpolated[lastRelayIdx].distFromStart;
+      const dh = interpolated[i].height - interpolated[lastRelayIdx].height;
+      const loss = calcLossForDistance(dist, dh, params);
+      const remain = currentPressure - loss;
+      if (remain < params.minInletPressureMPa) {
+        const relayIdx = i - 1 > lastRelayIdx ? i - 1 : i;
+        relays.push({ index: relayIdx, lon: interpolated[relayIdx].lon, lat: interpolated[relayIdx].lat, height: interpolated[relayIdx].height });
+        lastRelayIdx = relayIdx;
+        currentPressure = params.relayOutputMPa;
+      }
+    }
+    return relays;
+  }
+  function computePumpSegments(interpolated, relays, params) {
+    const segments = [];
+    const relayIndices = [0, ...relays.map((r) => r.index)];
+    for (let p = 0; p < relayIndices.length; p++) {
+      const startIdx = relayIndices[p];
+      const endIdx = p < relayIndices.length - 1 ? relayIndices[p + 1] : interpolated.length - 1;
+      const dist = interpolated[endIdx].distFromStart - interpolated[startIdx].distFromStart;
+      const dh = interpolated[endIdx].height - interpolated[startIdx].height;
+      const hoses = Math.ceil(dist / params.hoseLengthM);
+      const loss = calcLossForDistance(dist, dh, params);
+      const outputP = p === 0 ? params.pumpOutputMPa : params.relayOutputMPa;
+      const remain = outputP - loss;
+      const pumpLabel = p === 0 ? "\u6D88\u9632\u8ECA" : `P${p + 1}`;
+      const nextLabel = p < relayIndices.length - 1 ? `P${p + 2}` : "\u7B52\u5148";
+      segments.push({ pumpLabel, nextLabel, distance: dist, hoses, elevation: dh, loss, remainingPressure: remain });
+    }
+    return segments;
+  }
+  function runSimulationForLine(lineId, pathLLH) {
+    readParamsFromUI();
+    clearSimulationVisuals(lineId);
+    const interpolated = interpolatePath(pathLLH, 10);
+    const params = state_default.hoseParams;
+    const relays = computeRelayPositions(interpolated, params);
+    const pumpSegments = computePumpSegments(interpolated, relays, params);
+    const totalDist = interpolated[interpolated.length - 1].distFromStart;
+    const totalHoses = Math.ceil(totalDist / params.hoseLengthM);
+    const endPressure = pumpSegments.length > 0 ? pumpSegments[pumpSegments.length - 1].remainingPressure : params.pumpOutputMPa;
+    renderStartEndMarkers(lineId, pathLLH);
+    renderRelayMarkers(lineId, relays);
+    renderColorizedLines(lineId, interpolated, relays, pumpSegments);
+    updateHoseInfoPanel({ totalLengthM: totalDist, totalHoses20m: totalHoses, endPressureMPa: endPressure, totalPumps: relays.length + 1, pumpSegments });
+    state_default.viewer.scene.requestRender();
+  }
+  function renderStartEndMarkers(lineId, pathLLH) {
+    const prev = state_default.hoseSimState.startEndMarkersByLine.get(lineId) || [];
+    prev.forEach((e) => state_default.viewer.entities.remove(e));
+    const markers = [];
+    if (pathLLH.length >= 1) {
+      const start = pathLLH[0];
+      const e = state_default.viewer.entities.add({
+        id: "start-" + lineId,
+        position: Cesium.Cartesian3.fromDegrees(start.lon, start.lat, start.height || 0),
+        point: { pixelSize: 14, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+        label: { text: "\u{1F692}", font: "bold 12px sans-serif", fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
+      });
+      e.markerData = { name: "\u6D88\u9632\u8ECA\uFF08P1\uFF09", lat: start.lat, lon: start.lon, height: start.height || 0 };
+      markers.push(e);
+    }
+    if (pathLLH.length >= 2) {
+      const end = pathLLH[pathLLH.length - 1];
+      const e = state_default.viewer.entities.add({
+        id: "end-" + lineId,
+        position: Cesium.Cartesian3.fromDegrees(end.lon, end.lat, end.height || 0),
+        point: { pixelSize: 12, color: Cesium.Color.BLUE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+        label: { text: "\u7B52\u5148", font: "bold 11px sans-serif", fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
+      });
+      e.markerData = { name: "\u7B52\u5148", lat: end.lat, lon: end.lon, height: end.height || 0 };
+      markers.push(e);
+    }
+    state_default.hoseSimState.startEndMarkersByLine.set(lineId, markers);
+  }
+  function renderRelayMarkers(lineId, relays) {
+    const prev = state_default.hoseSimState.relayMarkersByLine.get(lineId) || [];
+    prev.forEach((e) => state_default.viewer.entities.remove(e));
+    const markers = relays.map((r, i) => {
+      const e = state_default.viewer.entities.add({
+        id: "relay-" + lineId + "-" + i,
+        position: Cesium.Cartesian3.fromDegrees(r.lon, r.lat, r.height || 0),
+        point: { pixelSize: 12, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+        label: { text: "P" + (i + 2), font: "bold 11px sans-serif", fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
+      });
+      e.relayData = { name: "P" + (i + 2), lat: r.lat, lon: r.lon, height: r.height || 0 };
+      return e;
+    });
+    state_default.hoseSimState.relayMarkersByLine.set(lineId, markers);
+  }
+  function renderColorizedLines(lineId, interpolated, relays, pumpSegments) {
+    const prev = state_default.hoseSimState.colorizedLinesByLine.get(lineId) || [];
+    prev.forEach((e) => state_default.viewer.entities.remove(e));
+    const lines = [];
+    const params = state_default.hoseParams;
+    for (let p = 0; p < pumpSegments.length; p++) {
+      let startIdx, endIdx;
+      if (p === 0) {
+        startIdx = 0;
+        endIdx = relays.length > 0 ? relays[0].index : interpolated.length - 1;
+      } else if (p <= relays.length) {
+        startIdx = relays[p - 1].index;
+        endIdx = p < relays.length ? relays[p].index : interpolated.length - 1;
+      } else continue;
+      const startPressure = p === 0 ? params.pumpOutputMPa : params.relayOutputMPa;
+      const startDist = interpolated[startIdx].distFromStart;
+      const startHeight = interpolated[startIdx].height || 0;
+      let currentColorStart = startIdx;
+      let currentColor = null;
+      for (let i = startIdx; i <= endIdx; i++) {
+        const dist = interpolated[i].distFromStart - startDist;
+        const dh = (interpolated[i].height || 0) - startHeight;
+        const loss = calcLossForDistance(dist, dh, params);
+        const pressure = startPressure - loss;
+        const newColor = pressure >= 0.5 ? "green" : pressure >= 0.3 ? "yellow" : "red";
+        if (currentColor !== null && newColor !== currentColor) {
+          lines.push(createColorSegment(lineId, p, currentColorStart, i, interpolated, currentColor));
+          currentColorStart = i;
+        }
+        currentColor = newColor;
+      }
+      if (currentColorStart < endIdx) {
+        lines.push(createColorSegment(lineId, p, currentColorStart, endIdx, interpolated, currentColor));
+      }
+    }
+    state_default.hoseSimState.colorizedLinesByLine.set(lineId, lines.filter(Boolean));
+    setTimeout(() => state_default.viewer.scene.requestRender(), 100);
+  }
+  function createColorSegment(lineId, pumpIdx, startIdx, endIdx, interpolated, color) {
+    const positions = [];
+    for (let j = startIdx; j <= endIdx; j++) {
+      if (interpolated[j]) positions.push(Cesium.Cartesian3.fromDegrees(interpolated[j].lon, interpolated[j].lat, interpolated[j].height || 0));
+    }
+    if (positions.length < 2) return null;
+    const cesiumColor = color === "green" ? Cesium.Color.LIMEGREEN : color === "yellow" ? Cesium.Color.YELLOW : Cesium.Color.RED;
+    return state_default.viewer.entities.add({
+      id: lineId + "-seg-" + pumpIdx + "-" + startIdx,
+      polyline: { positions, width: 5, material: cesiumColor.withAlpha(0.9), clampToGround: true }
+    });
+  }
+  function updateHoseInfoPanel(data) {
+    document.getElementById("hoseInfoDist").textContent = formatDistance(data.totalLengthM);
+    document.getElementById("hoseInfoCount").textContent = data.totalHoses20m + "\u672C";
+    const endPEl = document.getElementById("hoseInfoEndP");
+    endPEl.textContent = data.endPressureMPa.toFixed(2) + " MPa";
+    endPEl.className = data.endPressureMPa >= state_default.hoseParams.nozzleRequiredMPa ? "panel-stat-value ok" : data.endPressureMPa >= state_default.hoseParams.minInletPressureMPa ? "panel-stat-value highlight" : "panel-stat-value warning";
+    document.getElementById("hoseInfoRelay").textContent = data.totalPumps - 1 + "\u53F0";
+    if (data.pumpSegments) {
+      const tbody = document.getElementById("segmentTableBody");
+      let html = "";
+      for (const seg of data.pumpSegments) {
+        const colorClass = seg.remainingPressure >= 0.4 ? "green" : seg.remainingPressure >= 0.2 ? "yellow" : "red";
+        const elevClass = seg.elevation >= 0 ? "elev-up" : "elev-down";
+        const elevStr = seg.elevation >= 0 ? "+" + seg.elevation.toFixed(0) : seg.elevation.toFixed(0);
+        html += `<tr class="${colorClass}"><td>${seg.pumpLabel}\u2192${seg.nextLabel}</td><td>${seg.distance.toFixed(0)}m</td><td>${seg.hoses}\u672C</td><td class="${elevClass}">${elevStr}m</td><td>${seg.loss.toFixed(2)}</td><td>${seg.remainingPressure.toFixed(2)}</td></tr>`;
+      }
+      tbody.innerHTML = html;
+    }
+  }
+  var init_hose = __esm({
+    "js/hose.js"() {
+      init_state();
+      init_utils();
+      init_ui();
+      init_storage();
+    }
+  });
+
+  // js/trace.js
+  var trace_exports = {};
+  __export(trace_exports, {
+    traceTrailRoute: () => traceTrailRoute,
+    updateTraceGuide: () => updateTraceGuide
+  });
+  function updateTraceGuide() {
+    if (!state_default.traceGuideActive) return;
+    const hasTrails = trailGraph.nodes.size > 0;
+    const hasWater = state_default.waterSources.length > 0;
+    const hasFire = state_default.firePoints.length > 0;
+    if (hasTrails && hasWater && hasFire) {
+      state_default.traceGuideActive = false;
+      hideGuideBanner();
+      setTimeout(() => executeTrace(), 300);
+      return;
+    }
+    showGuideBanner([
+      { label: "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3080", done: hasTrails, active: !hasTrails },
+      { label: "\u6C34\u5229\u3092\u767B\u9332", done: hasWater, active: hasTrails && !hasWater },
+      { label: "\u706B\u70B9\u3092\u767B\u9332", done: hasFire, active: hasTrails && hasWater && !hasFire },
+      { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
+    ]);
+  }
+  async function traceTrailRoute() {
+    closeSidePanel();
+    const hasTrails = trailGraph.nodes.size > 0;
+    const hasWater = state_default.waterSources.length > 0;
+    const hasFire = state_default.firePoints.length > 0;
+    if (!hasTrails || !hasWater || !hasFire) {
+      state_default.traceGuideActive = true;
+      updateTraceGuide();
+      return;
+    }
+    hideGuideBanner();
+    state_default.traceGuideActive = false;
+    await executeTrace();
+  }
+  async function executeTrace() {
+    showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
+    const water = state_default.waterSources[state_default.waterSources.length - 1];
+    const fire = state_default.firePoints[state_default.firePoints.length - 1];
+    const nearWater = findNearestNode(water.lon, water.lat, 1e3);
+    const nearFire = findNearestNode(fire.lon, fire.lat, 1e3);
+    if (!nearWater) {
+      showLoading(false);
+      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      return;
+    }
+    if (!nearFire) {
+      showLoading(false);
+      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      return;
+    }
+    showLoading(true, "\u30C0\u30A4\u30AF\u30B9\u30C8\u30E9\u63A2\u7D22\u4E2D...", 40);
+    const result = dijkstra(nearWater.id, nearFire.id);
+    if (!result) {
+      showLoading(false);
+      showToast("\u6C34\u5229\u2192\u706B\u70B9\u306E\u7D4C\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF08\u9053\u304C\u3064\u306A\u304C\u3063\u3066\u3044\u306A\u3044\u53EF\u80FD\u6027\uFF09");
+      return;
+    }
+    showLoading(true, `\u30EB\u30FC\u30C8\u767A\u898B\uFF08${result.path.length}\u70B9, ${(result.totalDist / 1e3).toFixed(1)}km\uFF09\u6A19\u9AD8\u53D6\u5F97\u4E2D...`, 60);
+    const fullPath = [{ lon: water.lon, lat: water.lat }];
+    fullPath.push(...result.path);
+    fullPath.push({ lon: fire.lon, lat: fire.lat });
+    const simplified = simplifyPath(fullPath, 100);
+    showLoading(true, "\u6A19\u9AD8\u30C7\u30FC\u30BF\u3092\u53D6\u5F97\u4E2D...", 70);
+    const cartographics = simplified.map((p) => Cesium.Cartographic.fromDegrees(p.lon, p.lat));
+    try {
+      const updated = await Cesium.sampleTerrainMostDetailed(state_default.viewer.terrainProvider, cartographics);
+      for (let i = 0; i < simplified.length; i++) {
+        simplified[i].height = updated[i].height || 0;
+      }
+    } catch (e) {
+      console.warn("Terrain sampling failed:", e);
+      simplified.forEach((p) => p.height = p.height || 0);
+    }
+    showLoading(true, "\u30DB\u30FC\u30B9\u30E9\u30A4\u30F3\u3092\u751F\u6210\u4E2D...", 90);
+    clearTool();
+    state_default.currentTool = "hose";
+    const ind = document.getElementById("modeIndicator");
+    const icon = document.getElementById("modeIcon");
+    const text = document.getElementById("modeText");
+    icon.textContent = "route";
+    text.textContent = "\u30DB\u30FC\u30B9\u5EF6\u9577";
+    ind.className = "mode-indicator show hose-mode";
+    document.getElementById("hosePanel").classList.add("active");
+    resetHoseLine();
+    for (const p of simplified) {
+      const cartesian = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.height);
+      addHosePoint(p.lon, p.lat, p.height, cartesian);
+    }
+    showLoading(false);
+    const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
+    showToast(`\u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
+    state_default.viewer.scene.requestRender();
+  }
+  function simplifyPath(path, maxPoints) {
+    if (path.length <= maxPoints) return path;
+    const step = (path.length - 1) / (maxPoints - 1);
+    const result = [];
+    for (let i = 0; i < maxPoints; i++) {
+      const idx = Math.min(Math.round(i * step), path.length - 1);
+      result.push(path[idx]);
+    }
+    result[0] = path[0];
+    result[result.length - 1] = path[path.length - 1];
+    return result;
+  }
+  var init_trace = __esm({
+    "js/trace.js"() {
+      init_state();
+      init_trails();
+      init_hose();
+      init_ui();
+      init_utils();
     }
   });
 
@@ -358,6 +858,7 @@ var HoseCalc = (() => {
         if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9\uFF09`);
         else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
         success = true;
+        if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
       } catch (e) {
         console.log("Trail server failed:", server, e.message);
       }
@@ -675,39 +1176,7 @@ var HoseCalc = (() => {
   // js/fire.js
   init_state();
   init_ui();
-
-  // js/storage.js
-  init_state();
-  var STORAGE_KEY = "hosecalc_data";
-  function saveAllData() {
-    if (state_default.isRestoring) return;
-    try {
-      const data = {
-        firePoints: state_default.firePoints.map((p) => ({ id: p.id, lon: p.lon, lat: p.lat, height: p.height })),
-        waterSources: state_default.waterSources.map((w) => ({ id: w.id, type: w.type, name: w.name, lon: w.lon, lat: w.lat })),
-        confirmedLines: state_default.confirmedLines.map((l) => ({ id: l.id, points: l.points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height })) })),
-        counters: { fire: state_default.firePointIdCounter, water: state_default.waterIdCounter }
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.warn("Save failed:", e);
-    }
-  }
-  function loadAllData() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (e) {
-      console.warn("Load failed:", e);
-      return null;
-    }
-  }
-  function clearStoredData() {
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  // js/fire.js
+  init_storage();
   function createFireIcon() {
     const c = document.createElement("canvas");
     c.width = 32;
@@ -737,6 +1206,7 @@ var HoseCalc = (() => {
     });
     state_default.firePointEntities.push(e);
     if (!state_default.isRestoring) saveAllData();
+    if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
     return id;
   }
   function selectFirePoint(id) {
@@ -771,6 +1241,7 @@ var HoseCalc = (() => {
   init_state();
   init_config();
   init_ui();
+  init_storage();
   var WATER_ICONS = { hydrant: "\u{1F4A7}", tank: "\u{1FAA3}", natural: "\u{1F30A}", other: "\u{1F4A7}" };
   function createWaterIcon(type) {
     const c = document.createElement("canvas");
@@ -802,6 +1273,7 @@ var HoseCalc = (() => {
     });
     state_default.waterEntities.push(e);
     if (!state_default.isRestoring) saveAllData();
+    if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
     return id;
   }
   function selectWater(id) {
@@ -832,343 +1304,12 @@ var HoseCalc = (() => {
     state_default.pendingWaterCoords = null;
   }
 
-  // js/hose.js
-  init_state();
-
-  // js/utils.js
-  init_state();
-  function geodesicDistance(lon1, lat1, lon2, lat2) {
-    return new Cesium.EllipsoidGeodesic(
-      Cesium.Cartographic.fromDegrees(lon1, lat1),
-      Cesium.Cartographic.fromDegrees(lon2, lat2)
-    ).surfaceDistance;
-  }
-  function formatDistance(m) {
-    return m >= 1e3 ? (m / 1e3).toFixed(2) + "km" : m.toFixed(0) + "m";
-  }
-  function calcLossForDistance(dist, dh, params) {
-    const hoses = dist / params.hoseLengthM;
-    const frictionLoss = hoses * params.lossPerHoseMPa;
-    const elevLoss = dh * 0.01;
-    return frictionLoss + elevLoss;
-  }
-  function interpolatePath(points, interval) {
-    const result = [];
-    let cumulative = 0;
-    result.push({ ...points[0], distFromStart: 0 });
-    for (let i = 1; i < points.length; i++) {
-      const p1 = points[i - 1], p2 = points[i];
-      const segDist = geodesicDistance(p1.lon, p1.lat, p2.lon, p2.lat);
-      const segElev = (p2.height || 0) - (p1.height || 0);
-      const steps = Math.ceil(segDist / interval);
-      for (let s = 1; s <= steps; s++) {
-        const t = s / steps;
-        cumulative += segDist / steps;
-        result.push({
-          lon: p1.lon + (p2.lon - p1.lon) * t,
-          lat: p1.lat + (p2.lat - p1.lat) * t,
-          height: (p1.height || 0) + segElev * t,
-          distFromStart: cumulative
-        });
-      }
-    }
-    return result;
-  }
-
-  // js/hose.js
-  init_ui();
-  function addHosePoint(lon, lat, height, cartesian) {
-    state_default.hosePoints.push({ lon, lat, height, cartesian });
-    const m = state_default.viewer.entities.add({
-      position: cartesian,
-      point: { pixelSize: 8, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 1, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND }
-    });
-    state_default.hoseMarkers.push(m);
-    updateHoseLine();
-    updateHosePanel();
-    state_default.viewer.scene.requestRender();
-  }
-  function updateHoseLine() {
-    if (state_default.hoseLine) state_default.viewer.entities.remove(state_default.hoseLine);
-    state_default.hoseLine = null;
-    if (state_default.hosePoints.length >= 2) {
-      state_default.hoseLine = state_default.viewer.entities.add({
-        polyline: { positions: state_default.hosePoints.map((p) => p.cartesian), width: 4, material: Cesium.Color.ORANGE.withAlpha(0.9), clampToGround: true }
-      });
-    }
-  }
-  function updateHosePanel() {
-    if (state_default.hosePoints.length < 2) {
-      document.getElementById("hoseTotalDist").textContent = "0m";
-      document.getElementById("hoseTotalCount").textContent = "0\u672C";
-      document.getElementById("hoseElevInfo").textContent = "-";
-      return;
-    }
-    let totalDist = 0;
-    for (let i = 1; i < state_default.hosePoints.length; i++) {
-      totalDist += geodesicDistance(state_default.hosePoints[i - 1].lon, state_default.hosePoints[i - 1].lat, state_default.hosePoints[i].lon, state_default.hosePoints[i].lat);
-    }
-    const totalHose = Math.ceil(totalDist / 20);
-    const elevDiff = state_default.hosePoints[state_default.hosePoints.length - 1].height - state_default.hosePoints[0].height;
-    document.getElementById("hoseTotalDist").textContent = formatDistance(totalDist);
-    document.getElementById("hoseTotalCount").textContent = totalHose + "\u672C";
-    document.getElementById("hoseElevInfo").textContent = (elevDiff >= 0 ? "+" : "") + elevDiff.toFixed(0) + "m";
-  }
-  function undoHosePoint() {
-    if (state_default.hosePoints.length === 0) return;
-    state_default.hosePoints.pop();
-    if (state_default.hoseMarkers.length > 0) state_default.viewer.entities.remove(state_default.hoseMarkers.pop());
-    updateHoseLine();
-    updateHosePanel();
-    state_default.viewer.scene.requestRender();
-  }
-  function resetHoseLine() {
-    state_default.hosePoints = [];
-    state_default.hoseMarkers.forEach((m) => state_default.viewer.entities.remove(m));
-    state_default.hoseMarkers = [];
-    if (state_default.hoseLine) {
-      state_default.viewer.entities.remove(state_default.hoseLine);
-      state_default.hoseLine = null;
-    }
-    updateHosePanel();
-    document.getElementById("hoseHint").textContent = "\u9023\u7D9A\u30BF\u30C3\u30D7\u3067\u30DD\u30A4\u30F3\u30C8\u8FFD\u52A0";
-  }
-  function closeHosePanel() {
-    document.getElementById("hosePanel").classList.remove("active");
-    resetHoseLine();
-    clearTool();
-  }
-  function confirmHoseLine() {
-    if (state_default.hosePoints.length < 2) {
-      showToast("2\u70B9\u4EE5\u4E0A\u5FC5\u8981\u3067\u3059");
-      return;
-    }
-    const lineId = "hose-" + Date.now();
-    const pathLLH = state_default.hosePoints.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height }));
-    state_default.confirmedLines.push({ id: lineId, points: [...state_default.hosePoints].map((p) => ({ lon: p.lon, lat: p.lat, height: p.height })) });
-    if (state_default.hoseLine) state_default.viewer.entities.remove(state_default.hoseLine);
-    state_default.hoseLine = null;
-    state_default.hoseMarkers.forEach((m) => state_default.viewer.entities.remove(m));
-    state_default.hoseMarkers = [];
-    runSimulationForLine(lineId, pathLLH);
-    state_default.hosePoints = [];
-    document.getElementById("hosePanel").classList.remove("active");
-    document.getElementById("hoseInfoPanel").classList.add("active");
-    clearTool();
-    state_default.viewer.scene.requestRender();
-    saveAllData();
-    showToast("\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3\u5B8C\u4E86");
-  }
-  function selectHoseLine(id) {
-    const line = state_default.confirmedLines.find((l) => l.id === id);
-    if (!line) return;
-    closeAllPanels();
-    state_default.selectedHoseLine = id;
-    const pathLLH = line.points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height }));
-    runSimulationForLine(id, pathLLH);
-    document.getElementById("hoseInfoPanel").classList.add("active");
-  }
-  function deleteSelectedHose() {
-    if (!state_default.selectedHoseLine) return;
-    const idx = state_default.confirmedLines.findIndex((l) => l.id === state_default.selectedHoseLine);
-    if (idx >= 0) state_default.confirmedLines.splice(idx, 1);
-    clearSimulationVisuals(state_default.selectedHoseLine);
-    document.getElementById("hoseInfoPanel").classList.remove("active");
-    state_default.selectedHoseLine = null;
-    state_default.viewer.scene.requestRender();
-    saveAllData();
-  }
-  function onParamChange() {
-    if (state_default.selectedHoseLine) {
-      const line = state_default.confirmedLines.find((l) => l.id === state_default.selectedHoseLine);
-      if (line) runSimulationForLine(state_default.selectedHoseLine, line.points.map((p) => ({ lon: p.lon, lat: p.lat, height: p.height })));
-    }
-  }
-  function readParamsFromUI() {
-    state_default.hoseParams.pumpOutputMPa = parseFloat(document.getElementById("paramPumpOut").value) || 1.2;
-    state_default.hoseParams.relayOutputMPa = parseFloat(document.getElementById("paramRelayOut").value) || 0.8;
-    state_default.hoseParams.minInletPressureMPa = parseFloat(document.getElementById("paramInlet").value) || 0.15;
-    state_default.hoseParams.nozzleRequiredMPa = parseFloat(document.getElementById("paramNozzle").value) || 0.4;
-    state_default.hoseParams.lossPerHoseMPa = parseFloat(document.getElementById("paramLossPerHose").value) || 0.02;
-  }
-  function clearSimulationVisuals(lineId) {
-    const ss = state_default.hoseSimState;
-    (ss.markersByLineId.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
-    ss.markersByLineId.delete(lineId);
-    (ss.relayMarkersByLine.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
-    ss.relayMarkersByLine.delete(lineId);
-    (ss.colorizedLinesByLine.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
-    ss.colorizedLinesByLine.delete(lineId);
-    (ss.startEndMarkersByLine.get(lineId) || []).forEach((e) => state_default.viewer.entities.remove(e));
-    ss.startEndMarkersByLine.delete(lineId);
-  }
-  function computeRelayPositions(interpolated, params) {
-    const relays = [];
-    let currentPressure = params.pumpOutputMPa;
-    let lastRelayIdx = 0;
-    for (let i = 1; i < interpolated.length; i++) {
-      const dist = interpolated[i].distFromStart - interpolated[lastRelayIdx].distFromStart;
-      const dh = interpolated[i].height - interpolated[lastRelayIdx].height;
-      const loss = calcLossForDistance(dist, dh, params);
-      const remain = currentPressure - loss;
-      if (remain < params.minInletPressureMPa) {
-        const relayIdx = i - 1 > lastRelayIdx ? i - 1 : i;
-        relays.push({ index: relayIdx, lon: interpolated[relayIdx].lon, lat: interpolated[relayIdx].lat, height: interpolated[relayIdx].height });
-        lastRelayIdx = relayIdx;
-        currentPressure = params.relayOutputMPa;
-      }
-    }
-    return relays;
-  }
-  function computePumpSegments(interpolated, relays, params) {
-    const segments = [];
-    const relayIndices = [0, ...relays.map((r) => r.index)];
-    for (let p = 0; p < relayIndices.length; p++) {
-      const startIdx = relayIndices[p];
-      const endIdx = p < relayIndices.length - 1 ? relayIndices[p + 1] : interpolated.length - 1;
-      const dist = interpolated[endIdx].distFromStart - interpolated[startIdx].distFromStart;
-      const dh = interpolated[endIdx].height - interpolated[startIdx].height;
-      const hoses = Math.ceil(dist / params.hoseLengthM);
-      const loss = calcLossForDistance(dist, dh, params);
-      const outputP = p === 0 ? params.pumpOutputMPa : params.relayOutputMPa;
-      const remain = outputP - loss;
-      const pumpLabel = p === 0 ? "\u6D88\u9632\u8ECA" : `P${p + 1}`;
-      const nextLabel = p < relayIndices.length - 1 ? `P${p + 2}` : "\u7B52\u5148";
-      segments.push({ pumpLabel, nextLabel, distance: dist, hoses, elevation: dh, loss, remainingPressure: remain });
-    }
-    return segments;
-  }
-  function runSimulationForLine(lineId, pathLLH) {
-    readParamsFromUI();
-    clearSimulationVisuals(lineId);
-    const interpolated = interpolatePath(pathLLH, 10);
-    const params = state_default.hoseParams;
-    const relays = computeRelayPositions(interpolated, params);
-    const pumpSegments = computePumpSegments(interpolated, relays, params);
-    const totalDist = interpolated[interpolated.length - 1].distFromStart;
-    const totalHoses = Math.ceil(totalDist / params.hoseLengthM);
-    const endPressure = pumpSegments.length > 0 ? pumpSegments[pumpSegments.length - 1].remainingPressure : params.pumpOutputMPa;
-    renderStartEndMarkers(lineId, pathLLH);
-    renderRelayMarkers(lineId, relays);
-    renderColorizedLines(lineId, interpolated, relays, pumpSegments);
-    updateHoseInfoPanel({ totalLengthM: totalDist, totalHoses20m: totalHoses, endPressureMPa: endPressure, totalPumps: relays.length + 1, pumpSegments });
-    state_default.viewer.scene.requestRender();
-  }
-  function renderStartEndMarkers(lineId, pathLLH) {
-    const prev = state_default.hoseSimState.startEndMarkersByLine.get(lineId) || [];
-    prev.forEach((e) => state_default.viewer.entities.remove(e));
-    const markers = [];
-    if (pathLLH.length >= 1) {
-      const start = pathLLH[0];
-      const e = state_default.viewer.entities.add({
-        id: "start-" + lineId,
-        position: Cesium.Cartesian3.fromDegrees(start.lon, start.lat, start.height || 0),
-        point: { pixelSize: 14, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
-        label: { text: "\u{1F692}", font: "bold 12px sans-serif", fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
-      });
-      e.markerData = { name: "\u6D88\u9632\u8ECA\uFF08P1\uFF09", lat: start.lat, lon: start.lon, height: start.height || 0 };
-      markers.push(e);
-    }
-    if (pathLLH.length >= 2) {
-      const end = pathLLH[pathLLH.length - 1];
-      const e = state_default.viewer.entities.add({
-        id: "end-" + lineId,
-        position: Cesium.Cartesian3.fromDegrees(end.lon, end.lat, end.height || 0),
-        point: { pixelSize: 12, color: Cesium.Color.BLUE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
-        label: { text: "\u7B52\u5148", font: "bold 11px sans-serif", fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
-      });
-      e.markerData = { name: "\u7B52\u5148", lat: end.lat, lon: end.lon, height: end.height || 0 };
-      markers.push(e);
-    }
-    state_default.hoseSimState.startEndMarkersByLine.set(lineId, markers);
-  }
-  function renderRelayMarkers(lineId, relays) {
-    const prev = state_default.hoseSimState.relayMarkersByLine.get(lineId) || [];
-    prev.forEach((e) => state_default.viewer.entities.remove(e));
-    const markers = relays.map((r, i) => {
-      const e = state_default.viewer.entities.add({
-        id: "relay-" + lineId + "-" + i,
-        position: Cesium.Cartesian3.fromDegrees(r.lon, r.lat, r.height || 0),
-        point: { pixelSize: 12, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
-        label: { text: "P" + (i + 2), font: "bold 11px sans-serif", fillColor: Cesium.Color.WHITE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -12) }
-      });
-      e.relayData = { name: "P" + (i + 2), lat: r.lat, lon: r.lon, height: r.height || 0 };
-      return e;
-    });
-    state_default.hoseSimState.relayMarkersByLine.set(lineId, markers);
-  }
-  function renderColorizedLines(lineId, interpolated, relays, pumpSegments) {
-    const prev = state_default.hoseSimState.colorizedLinesByLine.get(lineId) || [];
-    prev.forEach((e) => state_default.viewer.entities.remove(e));
-    const lines = [];
-    const params = state_default.hoseParams;
-    for (let p = 0; p < pumpSegments.length; p++) {
-      let startIdx, endIdx;
-      if (p === 0) {
-        startIdx = 0;
-        endIdx = relays.length > 0 ? relays[0].index : interpolated.length - 1;
-      } else if (p <= relays.length) {
-        startIdx = relays[p - 1].index;
-        endIdx = p < relays.length ? relays[p].index : interpolated.length - 1;
-      } else continue;
-      const startPressure = p === 0 ? params.pumpOutputMPa : params.relayOutputMPa;
-      const startDist = interpolated[startIdx].distFromStart;
-      const startHeight = interpolated[startIdx].height || 0;
-      let currentColorStart = startIdx;
-      let currentColor = null;
-      for (let i = startIdx; i <= endIdx; i++) {
-        const dist = interpolated[i].distFromStart - startDist;
-        const dh = (interpolated[i].height || 0) - startHeight;
-        const loss = calcLossForDistance(dist, dh, params);
-        const pressure = startPressure - loss;
-        const newColor = pressure >= 0.5 ? "green" : pressure >= 0.3 ? "yellow" : "red";
-        if (currentColor !== null && newColor !== currentColor) {
-          lines.push(createColorSegment(lineId, p, currentColorStart, i, interpolated, currentColor));
-          currentColorStart = i;
-        }
-        currentColor = newColor;
-      }
-      if (currentColorStart < endIdx) {
-        lines.push(createColorSegment(lineId, p, currentColorStart, endIdx, interpolated, currentColor));
-      }
-    }
-    state_default.hoseSimState.colorizedLinesByLine.set(lineId, lines.filter(Boolean));
-    setTimeout(() => state_default.viewer.scene.requestRender(), 100);
-  }
-  function createColorSegment(lineId, pumpIdx, startIdx, endIdx, interpolated, color) {
-    const positions = [];
-    for (let j = startIdx; j <= endIdx; j++) {
-      if (interpolated[j]) positions.push(Cesium.Cartesian3.fromDegrees(interpolated[j].lon, interpolated[j].lat, interpolated[j].height || 0));
-    }
-    if (positions.length < 2) return null;
-    const cesiumColor = color === "green" ? Cesium.Color.LIMEGREEN : color === "yellow" ? Cesium.Color.YELLOW : Cesium.Color.RED;
-    return state_default.viewer.entities.add({
-      id: lineId + "-seg-" + pumpIdx + "-" + startIdx,
-      polyline: { positions, width: 5, material: cesiumColor.withAlpha(0.9), clampToGround: true }
-    });
-  }
-  function updateHoseInfoPanel(data) {
-    document.getElementById("hoseInfoDist").textContent = formatDistance(data.totalLengthM);
-    document.getElementById("hoseInfoCount").textContent = data.totalHoses20m + "\u672C";
-    const endPEl = document.getElementById("hoseInfoEndP");
-    endPEl.textContent = data.endPressureMPa.toFixed(2) + " MPa";
-    endPEl.className = data.endPressureMPa >= state_default.hoseParams.nozzleRequiredMPa ? "panel-stat-value ok" : data.endPressureMPa >= state_default.hoseParams.minInletPressureMPa ? "panel-stat-value highlight" : "panel-stat-value warning";
-    document.getElementById("hoseInfoRelay").textContent = data.totalPumps - 1 + "\u53F0";
-    if (data.pumpSegments) {
-      const tbody = document.getElementById("segmentTableBody");
-      let html = "";
-      for (const seg of data.pumpSegments) {
-        const colorClass = seg.remainingPressure >= 0.4 ? "green" : seg.remainingPressure >= 0.2 ? "yellow" : "red";
-        const elevClass = seg.elevation >= 0 ? "elev-up" : "elev-down";
-        const elevStr = seg.elevation >= 0 ? "+" + seg.elevation.toFixed(0) : seg.elevation.toFixed(0);
-        html += `<tr class="${colorClass}"><td>${seg.pumpLabel}\u2192${seg.nextLabel}</td><td>${seg.distance.toFixed(0)}m</td><td>${seg.hoses}\u672C</td><td class="${elevClass}">${elevStr}m</td><td>${seg.loss.toFixed(2)}</td><td>${seg.remainingPressure.toFixed(2)}</td></tr>`;
-      }
-      tbody.innerHTML = html;
-    }
-  }
+  // js/app.js
+  init_hose();
 
   // js/measure.js
   init_state();
+  init_utils();
   init_ui();
   function addMeasurePoint(lon, lat, height, cartesian) {
     state_default.measurePoints.push({ lon, lat, height, cartesian });
@@ -1234,9 +1375,13 @@ var HoseCalc = (() => {
     document.getElementById("searchResults").classList.remove("show");
   }
 
+  // js/app.js
+  init_storage();
+
   // js/share.js
   init_state();
   init_ui();
+  init_hose();
   function roundCoord(v, decimals = 5) {
     return Math.round(v * Math.pow(10, decimals)) / Math.pow(10, decimals);
   }
@@ -1381,6 +1526,7 @@ var HoseCalc = (() => {
   // js/events.js
   init_state();
   init_ui();
+  init_hose();
   function initEventHandlers() {
     const handler = new Cesium.ScreenSpaceEventHandler(state_default.viewer.scene.canvas);
     handler.setInputAction(function(click) {
@@ -1501,97 +1647,8 @@ var HoseCalc = (() => {
     });
   }
 
-  // js/trace.js
-  init_state();
-  init_trails();
-  init_ui();
-  async function traceTrailRoute() {
-    closeSidePanel();
-    const hasTrails = trailGraph.nodes.size > 0;
-    const hasWater = state_default.waterSources.length > 0;
-    const hasFire = state_default.firePoints.length > 0;
-    if (!hasTrails || !hasWater || !hasFire) {
-      showGuideBanner([
-        { label: "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3080", done: hasTrails, active: !hasTrails },
-        { label: "\u6C34\u5229\u3092\u767B\u9332", done: hasWater, active: hasTrails && !hasWater },
-        { label: "\u706B\u70B9\u3092\u767B\u9332", done: hasFire, active: hasTrails && hasWater && !hasFire },
-        { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
-      ]);
-      return;
-    }
-    hideGuideBanner();
-    showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
-    const water = state_default.waterSources[state_default.waterSources.length - 1];
-    const fire = state_default.firePoints[state_default.firePoints.length - 1];
-    const nearWater = findNearestNode(water.lon, water.lat, 1e3);
-    const nearFire = findNearestNode(fire.lon, fire.lat, 1e3);
-    if (!nearWater) {
-      showLoading(false);
-      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
-      return;
-    }
-    if (!nearFire) {
-      showLoading(false);
-      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
-      return;
-    }
-    showLoading(true, "\u30C0\u30A4\u30AF\u30B9\u30C8\u30E9\u63A2\u7D22\u4E2D...", 40);
-    const result = dijkstra(nearWater.id, nearFire.id);
-    if (!result) {
-      showLoading(false);
-      showToast("\u6C34\u5229\u2192\u706B\u70B9\u306E\u7D4C\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF08\u9053\u304C\u3064\u306A\u304C\u3063\u3066\u3044\u306A\u3044\u53EF\u80FD\u6027\uFF09");
-      return;
-    }
-    showLoading(true, `\u30EB\u30FC\u30C8\u767A\u898B\uFF08${result.path.length}\u30DD\u30A4\u30F3\u30C8, ${(result.totalDist / 1e3).toFixed(1)}km\uFF09\u6A19\u9AD8\u53D6\u5F97\u4E2D...`, 60);
-    const fullPath = [{ lon: water.lon, lat: water.lat }];
-    fullPath.push(...result.path);
-    fullPath.push({ lon: fire.lon, lat: fire.lat });
-    const simplified = simplifyPath(fullPath, 100);
-    showLoading(true, "\u6A19\u9AD8\u30C7\u30FC\u30BF\u3092\u53D6\u5F97\u4E2D...", 70);
-    const cartographics = simplified.map((p) => Cesium.Cartographic.fromDegrees(p.lon, p.lat));
-    try {
-      const updated = await Cesium.sampleTerrainMostDetailed(state_default.viewer.terrainProvider, cartographics);
-      for (let i = 0; i < simplified.length; i++) {
-        simplified[i].height = updated[i].height || 0;
-      }
-    } catch (e) {
-      console.warn("Terrain sampling failed, using 0:", e);
-      simplified.forEach((p) => p.height = p.height || 0);
-    }
-    showLoading(true, "\u30DB\u30FC\u30B9\u30E9\u30A4\u30F3\u3092\u751F\u6210\u4E2D...", 90);
-    clearTool();
-    state_default.currentTool = "hose";
-    const ind = document.getElementById("modeIndicator");
-    const icon = document.getElementById("modeIcon");
-    const text = document.getElementById("modeText");
-    icon.textContent = "route";
-    text.textContent = "\u30DB\u30FC\u30B9\u5EF6\u9577";
-    ind.className = "mode-indicator show hose-mode";
-    document.getElementById("hosePanel").classList.add("active");
-    resetHoseLine();
-    for (const p of simplified) {
-      const cartesian = Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.height);
-      addHosePoint(p.lon, p.lat, p.height, cartesian);
-    }
-    showLoading(false);
-    const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
-    showToast(`\u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
-    state_default.viewer.scene.requestRender();
-  }
-  function simplifyPath(path, maxPoints) {
-    if (path.length <= maxPoints) return path;
-    const step = (path.length - 1) / (maxPoints - 1);
-    const result = [];
-    for (let i = 0; i < maxPoints; i++) {
-      const idx = Math.min(Math.round(i * step), path.length - 1);
-      result.push(path[idx]);
-    }
-    result[0] = path[0];
-    result[result.length - 1] = path[path.length - 1];
-    return result;
-  }
-
   // js/app.js
+  init_trace();
   window.onerror = function(msg, url, line, col, err) {
     console.error("[HoseCalc Error]", msg, url, line, col, err);
     const el = document.getElementById("loadingMessage");

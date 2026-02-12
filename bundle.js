@@ -144,6 +144,10 @@ var HoseCalc = (() => {
     if (hint) hint.textContent = "";
     document.getElementById("hosePanel").classList.remove("active");
     document.getElementById("measurePanel").classList.remove("active");
+    if (!state_default.traceGuideActive) {
+      const banner = document.getElementById("guideBanner");
+      if (banner) banner.classList.remove("show");
+    }
   }
   function closeAllPanels() {
     ["firePanel", "waterPanel", "hoseInfoPanel", "hosePanel", "measurePanel"].forEach(
@@ -708,6 +712,8 @@ var HoseCalc = (() => {
     await executeTrace();
   }
   async function executeTrace() {
+    hideGuideBanner();
+    state_default.traceGuideActive = false;
     showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
     const water = state_default.waterSources[state_default.waterSources.length - 1];
     const fire = state_default.firePoints[state_default.firePoints.length - 1];

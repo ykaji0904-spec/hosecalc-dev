@@ -64,18 +64,31 @@ export function initEventHandlers() {
             if (typeof picked.id === 'string') { pickedId = picked.id; }
             else if (picked.id.id && typeof picked.id.id === 'string') { pickedId = picked.id.id; entity = picked.id; }
 
-            // Marker tap → show info
-            if (pickedId.startsWith('relay-') || pickedId.startsWith('start-') || pickedId.startsWith('end-')) {
-                const data = entity.markerData || entity.relayData;
-                if (data) showMarkerInfo(data.name, data.lat, data.lon, data.height, click.position);
-                return;
-            }
-            if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; }
-            if (pickedId.startsWith('water-')) { selectWater(pickedId); return; }
-            if (pickedId.startsWith('hose-')) {
-                const lineId = pickedId.split('-seg-')[0];
-                selectHoseLine(lineId);
-                return;
+            // ホース延長・計測モード中はfire/waterタップをポイント追加として扱う
+            if (S.currentTool === 'hose' || S.currentTool === 'measure') {
+                if (pickedId.startsWith('fire-') || pickedId.startsWith('water-')) {
+                    // エンティティの位置を取得してポイント追加へフォールスルー
+                    // (下のtool action部分で処理される)
+                } else if (pickedId.startsWith('relay-') || pickedId.startsWith('start-') || pickedId.startsWith('end-')) {
+                    const data = entity.markerData || entity.relayData;
+                    if (data) showMarkerInfo(data.name, data.lat, data.lon, data.height, click.position);
+                    return;
+                }
+                // それ以外もフォールスルー（ポイント追加）
+            } else {
+                // 通常モード: エンティティ選択
+                if (pickedId.startsWith('relay-') || pickedId.startsWith('start-') || pickedId.startsWith('end-')) {
+                    const data = entity.markerData || entity.relayData;
+                    if (data) showMarkerInfo(data.name, data.lat, data.lon, data.height, click.position);
+                    return;
+                }
+                if (pickedId.startsWith('fire-')) { selectFirePoint(pickedId); return; }
+                if (pickedId.startsWith('water-')) { selectWater(pickedId); return; }
+                if (pickedId.startsWith('hose-')) {
+                    const lineId = pickedId.split('-seg-')[0];
+                    selectHoseLine(lineId);
+                    return;
+                }
             }
         }
 

@@ -20,7 +20,8 @@ const S = {
     hoseParams: { ...HOSE_PARAMS_DEFAULT },
     measurePoints: [], measureMarkers: [], measureLine: null,
     lastClickedCoords: null, longPressTimer: null, longPressStartPos: null,
-    isRestoring: false
+    isRestoring: false,
+    traceGuideActive: false
 };
 
 export default S;

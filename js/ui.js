@@ -46,6 +46,11 @@ export function clearTool() {
     if (hint) hint.textContent = '';
     document.getElementById('hosePanel').classList.remove('active');
     document.getElementById('measurePanel').classList.remove('active');
+    // トレースガイド中でなければバナーも消す
+    if (!S.traceGuideActive) {
+        const banner = document.getElementById('guideBanner');
+        if (banner) banner.classList.remove('show');
+    }
 }
 
 export function closeAllPanels() {

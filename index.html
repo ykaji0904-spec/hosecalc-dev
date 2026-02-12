@@ -209,6 +209,27 @@
         .search-result-name{color:white;font-size:11px;font-weight:500}
         .search-result-address{color:rgba(255,255,255,0.5);font-size:9px;margin-top:2px}
         .cesium-viewer-toolbar,.cesium-viewer-animationContainer,.cesium-viewer-timelineContainer,.cesium-viewer-fullscreenContainer,.cesium-viewer-bottom{display:none!important}
+        .info-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:3500;display:none;justify-content:center;align-items:center;padding:20px}
+        .info-modal-overlay.show{display:flex}
+        .info-modal{background:rgba(25,25,25,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:16px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;padding:24px}
+        .info-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .info-modal-title{color:#ff9800;font-size:16px;font-weight:700}
+        .info-modal-close{background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;padding:4px;font-size:20px}
+        .info-modal-body{color:rgba(255,255,255,0.85);font-size:13px;line-height:1.8}
+        .info-modal-body h3{color:#00d4ff;font-size:14px;font-weight:600;margin:16px 0 8px 0}
+        .info-modal-body h3:first-child{margin-top:0}
+        .info-modal-body p{margin-bottom:8px}
+        .info-modal-body .param-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+        .info-modal-body .param-label{color:rgba(255,255,255,0.6)}
+        .info-modal-body .param-value{color:#4ade80;font-family:monospace}
+        .water-picker{position:fixed;background:rgba(20,20,20,0.98);border:1px solid rgba(33,150,243,0.4);border-radius:12px;padding:10px;z-index:2500;display:none;min-width:180px}
+        .water-picker.show{display:block}
+        .water-picker-title{color:rgba(255,255,255,0.5);font-size:10px;margin-bottom:8px;text-align:center}
+        .water-picker-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+        .water-picker-item{display:flex;flex-direction:column;align-items:center;padding:10px 8px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid transparent;gap:4px}
+        .water-picker-item:hover{background:rgba(33,150,243,0.15);border-color:rgba(33,150,243,0.3)}
+        .water-picker-item .material-icons{font-size:22px;color:#2196f3}
+        .water-picker-item span:last-child{color:white;font-size:11px}
         @media (min-width: 768px) {
             .top-bar { height: 60px; padding: 0 24px; }
             .logo-icon { width: 42px; height: 42px; }
@@ -240,6 +261,15 @@
     <div class="coord-popup" id="coordPopup"><div class="coord-popup-header"><span class="coord-popup-title">座標</span><button class="coord-popup-close" onclick="hideCoordPopup()">×</button></div><div class="coord-popup-value" id="coordPopupValue">-</div><button class="coord-popup-btn" onclick="copyCoords()"><span class="material-icons">content_copy</span>コピー</button></div>
     <div class="marker-popup" id="markerPopup"><div class="marker-popup-header"><span class="marker-popup-name" id="markerPopupName">-</span><button class="marker-popup-close" onclick="hideMarkerPopup()">×</button></div><div class="marker-popup-coord" id="markerPopupCoord">-</div><div class="marker-popup-elev" id="markerPopupElev">-</div><button class="marker-popup-btn" onclick="copyMarkerCoords()"><span class="material-icons">content_copy</span>コピー</button></div>
     <div class="mode-indicator" id="modeIndicator"><span class="material-icons" id="modeIcon">local_fire_department</span><span id="modeText">火点追加</span></div>
+    <div class="water-picker" id="waterPicker">
+        <div class="water-picker-title">水利の種別を選択</div>
+        <div class="water-picker-grid">
+            <div class="water-picker-item" onclick="confirmWaterType('hydrant')"><span class="material-icons">fire_hydrant</span><span>消火栓</span></div>
+            <div class="water-picker-item" onclick="confirmWaterType('tank')"><span class="material-icons">water</span><span>防火水槽</span></div>
+            <div class="water-picker-item" onclick="confirmWaterType('natural')"><span class="material-icons">waves</span><span>自然水利</span></div>
+            <div class="water-picker-item" onclick="confirmWaterType('other')"><span class="material-icons">pool</span><span>その他</span></div>
+        </div>
+    </div>
     <div class="side-panel-overlay" id="sidePanelOverlay" onclick="closeSidePanel()"></div>
     <div class="side-panel" id="sidePanel">
         <div class="side-panel-header"><span class="side-panel-title">メニュー</span><button class="side-panel-close" onclick="closeSidePanel()"><span class="material-icons">close</span></button></div>
@@ -259,6 +289,9 @@
         <div class="panel-section"><div class="panel-section-title">HoseCalcについて</div>
             <div class="info-links"><a class="info-link" href="#" onclick="showInfo('about');return false"><span class="material-icons">info</span><span>HoseCalcについて</span></a><a class="info-link" href="#" onclick="showInfo('usage');return false"><span class="material-icons">help_outline</span><span>使い方</span></a><a class="info-link" href="#" onclick="showInfo('calc');return false"><span class="material-icons">calculate</span><span>ホース延長の計算方法</span></a><a class="info-link" href="#" onclick="showInfo('source');return false"><span class="material-icons">source</span><span>情報元・データソース</span></a></div>
         </div>
+        <div class="panel-section"><div class="panel-section-title">データ管理</div>
+            <div class="info-links"><a class="info-link" href="#" onclick="clearAllDataConfirm();return false" style="color:#ef4444"><span class="material-icons" style="color:#ef4444">delete_forever</span><span>全データを削除</span></a></div>
+        </div>
     </div>
     <div class="bottom-panel fire" id="firePanel"><div class="panel-header"><span class="panel-title fire"><span class="material-icons">local_fire_department</span>火点</span><button class="panel-close" onclick="closePanel('fire')"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">緯度</div><div class="panel-stat-value copyable" id="fireLat" onclick="copyText(this)">-</div></div><div class="panel-stat"><div class="panel-stat-label">経度</div><div class="panel-stat-value copyable" id="fireLon" onclick="copyText(this)">-</div></div><div class="panel-stat"><div class="panel-stat-label">標高</div><div class="panel-stat-value fire-highlight" id="fireElev">-</div></div></div><div class="panel-actions"><button class="panel-btn danger" onclick="deleteSelectedFire()"><span class="material-icons">delete</span>削除</button></div></div>
     <div class="bottom-panel water" id="waterPanel"><div class="panel-header"><span class="panel-title water"><span class="material-icons">water_drop</span>水利</span><button class="panel-close" onclick="closePanel('water')"><span class="material-icons">close</span></button></div><div class="panel-stats"><div class="panel-stat"><div class="panel-stat-label">種別</div><div class="panel-stat-value water-highlight" id="waterType">-</div></div><div class="panel-stat"><div class="panel-stat-label">緯度</div><div class="panel-stat-value copyable" id="waterLat" onclick="copyText(this)">-</div></div><div class="panel-stat"><div class="panel-stat-label">経度</div><div class="panel-stat-value copyable" id="waterLon" onclick="copyText(this)">-</div></div></div><div class="panel-actions"><button class="panel-btn danger" onclick="deleteSelectedWater()"><span class="material-icons">delete</span>削除</button></div></div>
@@ -268,6 +301,12 @@
     <div class="map-info"><div class="scale-bar"><div class="scale-line" id="scaleLine"></div><span class="scale-text" id="scaleText">--</span></div><div class="credit-bar" id="creditBar">© Cesium Ion</div></div>
     <div class="bottom-bar"><div class="my-location" onclick="goToMyLocation()"><span class="material-icons">my_location</span><span class="my-location-coords" id="myLocationText">取得中...</span></div><div class="search-box"><input type="text" class="search-input" id="searchInput" placeholder="住所を検索..." onkeydown="if(event.key==='Enter')doSearch()"></div><div class="view-toggle"><button class="view-btn" onclick="setViewMode('2d')"><span class="material-icons">map</span>2D</button><button class="view-btn active" onclick="setViewMode('3d')"><span class="material-icons">view_in_ar</span>3D</button></div></div>
     <div class="search-results" id="searchResults"></div>
+    <div class="info-modal-overlay" id="infoModalOverlay" onclick="if(event.target===this)closeInfoModal()">
+        <div class="info-modal">
+            <div class="info-modal-header"><span class="info-modal-title" id="infoModalTitle">-</span><button class="info-modal-close" onclick="closeInfoModal()">×</button></div>
+            <div class="info-modal-body" id="infoModalBody"></div>
+        </div>
+    </div>
     <script>
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlNTEzZDliYi1lMTk0LTQ5NDQtODI1Zi00YjA1OGQyOGJmNmMiLCJpZCI6Mzg1NDQ0LCJpYXQiOjE3NzAxNzg5ODN9.7k1GwpDCERKghsJ2sdCKZZGBMSbJ4Ksbwlj47ejipy4';
         
@@ -446,15 +485,46 @@
             setTimeout(() => showLoading(false), 300);
         }
         
-        // 修正10: サイト説明変更
+        // 修正10: 情報モーダル表示
         function showInfo(type) { 
-            const m = { 
-                about: '【HoseCalc】\n\n林野火災などの際にホース延長シミュレーションを行うプラットフォームです。\n\n■ 主な機能\n・リアルな地形データを使ったホース延長シミュレーション\n・圧力損失と中継ポンプ位置の自動計算\n・火点・水利ポイントの登録と管理\n・洪水・津波・土砂災害ハザードマップの重畳表示\n・登山道の表示\n\n■ 対象ユーザー\n・消防職員\n・消防団員\n・その他防災関係者\n\n開発: Y.K.', 
-                usage: '【基本操作】\n\n■ 地図操作\n・ドラッグ: 地図の移動\n・ピンチ/スクロール: ズーム\n・右ドラッグ（PC）: 視点回転\n・Ctrl+ドラッグ（PC）: 傾き調整\n・ダブルタップ/長押し: 座標表示\n\n■ 火点を登録する\n1. メニュー →「火点」を選択\n2. 地図上の火災発生地点をタップ\n3. 登録完了\n\n■ 水利を登録する\n1. メニュー →「水利」を選択\n2. 消火栓・防火水槽などの位置をタップ\n3. 登録完了\n\n■ ホース延長シミュレーション\n1. メニュー →「ホース延長」を選択\n2. 水利位置から順にタップしてルートを描画\n3.「確定」ボタンで計算実行\n4. 中継ポンプ位置と残圧が自動表示\n\n■ 2点計測\n1. メニュー →「2点計測」を選択\n2. 2点をタップ\n3. 距離・高低差が表示', 
-                calc: '【計算式】\n\n■ パラメータ\n・消防車送水圧: 1.2 MPa\n・可搬ポンプ送水圧: 0.8 MPa\n・中継受水圧: 0.2 MPa\n・筒先必要圧: 0.4 MPa\n・摩擦損失: 0.02 MPa/本\n\n■ 圧力損失\n・摩擦損失 = 0.02 × ホース本数\n・高低差損失 = 0.01 × 高低差(m)\n\n■ 表示色\n・緑: ≥0.4 MPa\n・黄: ≥0.2 MPa\n・赤: <0.2 MPa', 
-                source: '【データソース】\n\n・衛星画像: Cesium Ion\n・地形: Cesium World Terrain\n・標準地図: 国土地理院\n・登山道: OpenStreetMap\n・ハザードマップ: 国土交通省' 
-            }; 
-            alert(m[type] || ''); 
+            const info = {
+                about: {
+                    title: 'HoseCalcについて',
+                    html: '<h3>概要</h3><p>林野火災などの際にホース延長シミュレーションを行うプラットフォームです。</p><h3>主な機能</h3><p>・リアルな地形データを使ったホース延長シミュレーション<br>・圧力損失と中継ポンプ位置の自動計算<br>・火点・水利ポイントの登録と管理<br>・洪水・津波・土砂災害ハザードマップの重畳表示<br>・登山道の表示</p><h3>対象ユーザー</h3><p>消防職員・消防団員・その他防災関係者</p><p style="color:rgba(255,255,255,0.4);margin-top:16px">開発: Y.K.</p>'
+                },
+                usage: {
+                    title: '使い方',
+                    html: '<h3>地図操作</h3><p>・ドラッグ: 地図の移動<br>・ピンチ/スクロール: ズーム<br>・右ドラッグ（PC）: 視点回転<br>・Ctrl+ドラッグ（PC）: 傾き調整<br>・ダブルタップ/長押し: 座標表示</p><h3>火点を登録する</h3><p>1. メニュー →「火点」を選択<br>2. 地図上の火災発生地点をタップ<br>3. 登録完了</p><h3>水利を登録する</h3><p>1. メニュー →「水利」を選択<br>2. 消火栓・防火水槽などの位置をタップ<br>3. 登録完了</p><h3>ホース延長シミュレーション</h3><p>1. メニュー →「ホース延長」を選択<br>2. 水利位置から順にタップしてルートを描画<br>3.「確定」ボタンで計算実行<br>4. 中継ポンプ位置と残圧が自動表示</p><h3>2点計測</h3><p>1. メニュー →「2点計測」を選択<br>2. 2点をタップ<br>3. 距離・高低差が表示</p>'
+                },
+                calc: {
+                    title: '計算方法',
+                    html: '<h3>パラメータ（初期値）</h3><div class="param-row"><span class="param-label">消防車送水圧</span><span class="param-value">1.2 MPa</span></div><div class="param-row"><span class="param-label">可搬ポンプ送水圧</span><span class="param-value">0.8 MPa</span></div><div class="param-row"><span class="param-label">中継受水圧</span><span class="param-value">0.15 MPa</span></div><div class="param-row"><span class="param-label">筒先必要圧</span><span class="param-value">0.4 MPa</span></div><div class="param-row"><span class="param-label">摩擦損失</span><span class="param-value">0.02 MPa/本</span></div><h3>圧力損失の計算式</h3><p>・摩擦損失 = 0.02 × ホース本数<br>・高低差損失 = 0.01 × 高低差(m)<br>　※上りはプラス（圧力低下）、下りはマイナス（圧力増加）</p><h3>ライン表示色</h3><div class="param-row"><span class="param-label">緑</span><span class="param-value">≥ 0.5 MPa</span></div><div class="param-row"><span class="param-label">黄</span><span class="param-value">0.3 〜 0.5 MPa</span></div><div class="param-row"><span class="param-label">赤</span><span class="param-value">< 0.3 MPa</span></div>'
+                },
+                source: {
+                    title: 'データソース',
+                    html: '<div class="param-row"><span class="param-label">衛星画像</span><span class="param-value">Cesium Ion</span></div><div class="param-row"><span class="param-label">地形</span><span class="param-value">Cesium World Terrain</span></div><div class="param-row"><span class="param-label">標準地図</span><span class="param-value">国土地理院</span></div><div class="param-row"><span class="param-label">登山道</span><span class="param-value">OpenStreetMap</span></div><div class="param-row"><span class="param-label">ハザードマップ</span><span class="param-value">国土交通省</span></div>'
+                }
+            };
+            const item = info[type];
+            if (!item) return;
+            document.getElementById('infoModalTitle').textContent = item.title;
+            document.getElementById('infoModalBody').innerHTML = item.html;
+            document.getElementById('infoModalOverlay').classList.add('show');
+        }
+        function closeInfoModal() { document.getElementById('infoModalOverlay').classList.remove('show'); }
+        function clearAllDataConfirm() {
+            closeSidePanel();
+            if (!confirm('全てのデータ（火点・水利・ホースライン）を削除しますか？')) return;
+            firePoints.forEach((_, i) => viewer.entities.remove(firePointEntities[i]));
+            firePoints = []; firePointEntities = []; selectedFirePoint = null;
+            waterSources.forEach((_, i) => viewer.entities.remove(waterEntities[i]));
+            waterSources = []; waterEntities = []; selectedWater = null;
+            confirmedLines.forEach(l => clearSimulationVisuals(l.id));
+            confirmedLines = []; selectedHoseLine = null;
+            closeAllPanels();
+            localStorage.removeItem('hosecalc_data');
+            viewer.scene.requestRender();
+            showToast('全データを削除しました');
         }
         async function doSearch() { const q = document.getElementById('searchInput').value.trim(); if (!q) return; showLoading(true, '検索中...', 50); try { const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=jp&limit=5`); const data = await res.json(); const sr = document.getElementById('searchResults'); sr.innerHTML = data.length === 0 ? '<div class="search-result-item"><span class="search-result-name">結果なし</span></div>' : data.map(r => `<div class="search-result-item" onclick="flyToSearch(${r.lon},${r.lat})"><div class="search-result-name">${r.display_name.split(',')[0]}</div><div class="search-result-address">${r.display_name}</div></div>`).join(''); sr.classList.add('show'); } catch(e) { showToast('検索エラー'); } showLoading(false); }
         function flyToSearch(lon, lat) { viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(lon, lat, 1500), duration: 1.5 }); document.getElementById('searchResults').classList.remove('show'); }
@@ -495,16 +565,13 @@
                 }, () => { document.getElementById('myLocationText').textContent = '取得失敗'; }, { timeout: 10000 });
             }
             
-            // 5秒後に登山道を自動読み込み
-            setTimeout(() => {
-                layers.trails = true;
-                document.getElementById('trailToggle').classList.add('active');
-                loadTrails();
-            }, 5000);
+            // 登山道はユーザーがメニューからONにした時のみ読み込み
         }
         
         // アプリ初期化実行
         initializeApp();
+        // データ復元（Cesium初期化完了後に実行）
+        setTimeout(() => restoreAllData(), 1500);
         
         function createMyLocationIcon() { const c = document.createElement('canvas'); c.width = 24; c.height = 24; const ctx = c.getContext('2d'); ctx.beginPath(); ctx.arc(12, 12, 10, 0, Math.PI * 2); ctx.fillStyle = '#4ade80'; ctx.fill(); ctx.beginPath(); ctx.arc(12, 12, 5, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill(); return c.toDataURL(); }
         function updateScaleBar() { try { const width = viewer.canvas.clientWidth; const left = viewer.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.3, viewer.canvas.clientHeight / 2)); const right = viewer.scene.camera.getPickRay(new Cesium.Cartesian2(width * 0.7, viewer.canvas.clientHeight / 2)); if (!left || !right) return; const leftPos = viewer.scene.globe.pick(left, viewer.scene); const rightPos = viewer.scene.globe.pick(right, viewer.scene); if (!leftPos || !rightPos) return; const distance = Cesium.Cartesian3.distance(leftPos, rightPos) / 2; let scaleValue = distance * (60 / (width * 0.2)); const scales = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]; let best = scales[0]; for (const s of scales) { if (scaleValue >= s) best = s; } const scaleWidth = Math.round(60 * (best / scaleValue)); document.getElementById('scaleLine').style.width = Math.max(30, Math.min(80, scaleWidth)) + 'px'; document.getElementById('scaleText').textContent = best >= 1000 ? (best/1000) + 'km' : best + 'm'; } catch(e) {} }
@@ -517,22 +584,73 @@
 
         // 火点
         let firePoints = [], firePointEntities = [], selectedFirePoint = null, firePointIdCounter = 0, fireAreaEntity = null;
-        function addFirePoint(lon, lat, height) { const id = `fire-${++firePointIdCounter}`; firePoints.push({ id, lon, lat, height }); const e = viewer.entities.add({ id: id, position: Cesium.Cartesian3.fromDegrees(lon, lat, height), billboard: { image: createFireIcon(), width: 32, height: 32, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } }); firePointEntities.push(e); return id; }
+        function addFirePoint(lon, lat, height) { const id = `fire-${++firePointIdCounter}`; firePoints.push({ id, lon, lat, height }); const e = viewer.entities.add({ id: id, position: Cesium.Cartesian3.fromDegrees(lon, lat, height), billboard: { image: createFireIcon(), width: 32, height: 32, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } }); firePointEntities.push(e); saveAllData(); return id; }
         function createFireIcon() { const c = document.createElement('canvas'); c.width = 32; c.height = 32; const ctx = c.getContext('2d'); ctx.beginPath(); ctx.arc(16, 16, 14, 0, Math.PI * 2); ctx.fillStyle = '#f44336'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔥', 16, 16); return c.toDataURL(); }
         function selectFirePoint(id) { const f = firePoints.find(p => p.id === id); if (!f) return; closeAllPanels(); selectedFirePoint = f; document.getElementById('fireLat').textContent = f.lat.toFixed(6) + '°'; document.getElementById('fireLon').textContent = f.lon.toFixed(6) + '°'; document.getElementById('fireElev').textContent = f.height.toFixed(1) + 'm'; document.getElementById('firePanel').classList.add('active'); }
-        function deleteSelectedFire() { if (!selectedFirePoint) return; const idx = firePoints.findIndex(p => p.id === selectedFirePoint.id); if (idx >= 0) { firePoints.splice(idx, 1); viewer.entities.remove(firePointEntities[idx]); firePointEntities.splice(idx, 1); } document.getElementById('firePanel').classList.remove('active'); selectedFirePoint = null; }
+        function deleteSelectedFire() { if (!selectedFirePoint) return; const idx = firePoints.findIndex(p => p.id === selectedFirePoint.id); if (idx >= 0) { firePoints.splice(idx, 1); viewer.entities.remove(firePointEntities[idx]); firePointEntities.splice(idx, 1); } document.getElementById('firePanel').classList.remove('active'); selectedFirePoint = null; saveAllData(); }
 
         // 水利
-        let waterSources = [], waterEntities = [], selectedWater = null, waterIdCounter = 0;
-        function addWaterSource(type, name, lon, lat) { const id = `water-${++waterIdCounter}`; const w = { id, type, name, lon, lat }; waterSources.push(w); const e = viewer.entities.add({ id: id, position: Cesium.Cartesian3.fromDegrees(lon, lat), billboard: { image: createWaterIcon(type), width: 28, height: 28, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } }); waterEntities.push(e); return id; }
-        function createWaterIcon(type) { const c = document.createElement('canvas'); c.width = 28; c.height = 28; const ctx = c.getContext('2d'); ctx.beginPath(); ctx.arc(14, 14, 12, 0, Math.PI * 2); ctx.fillStyle = '#2196f3'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💧', 14, 14); return c.toDataURL(); }
-        function selectWater(id) { const w = waterSources.find(s => s.id === id); if (!w) return; closeAllPanels(); selectedWater = w; document.getElementById('waterType').textContent = w.type === 'hydrant' ? '消火栓' : '水利'; document.getElementById('waterLat').textContent = w.lat.toFixed(6) + '°'; document.getElementById('waterLon').textContent = w.lon.toFixed(6) + '°'; document.getElementById('waterPanel').classList.add('active'); }
-        function deleteSelectedWater() { if (!selectedWater) return; const idx = waterSources.findIndex(s => s.id === selectedWater.id); if (idx >= 0) { waterSources.splice(idx, 1); viewer.entities.remove(waterEntities[idx]); waterEntities.splice(idx, 1); } document.getElementById('waterPanel').classList.remove('active'); selectedWater = null; }
+        let waterSources = [], waterEntities = [], selectedWater = null, waterIdCounter = 0, pendingWaterCoords = null;
+        const waterTypeNames = { hydrant: '消火栓', tank: '防火水槽', natural: '自然水利', other: 'その他' };
+        const waterTypeColors = { hydrant: '#2196f3', tank: '#9c27b0', natural: '#00bcd4', other: '#607d8b' };
+        function showWaterPicker(x, y) {
+            const picker = document.getElementById('waterPicker');
+            picker.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+            picker.style.top = Math.max(10, y - 160) + 'px';
+            picker.classList.add('show');
+        }
+        function hideWaterPicker() { document.getElementById('waterPicker').classList.remove('show'); }
+        function confirmWaterType(type) {
+            hideWaterPicker();
+            if (!pendingWaterCoords) return;
+            const name = waterTypeNames[type] + '#' + (waterIdCounter + 1);
+            const id = addWaterSource(type, name, pendingWaterCoords.lon, pendingWaterCoords.lat);
+            selectWater(id);
+            pendingWaterCoords = null;
+        }
+        document.addEventListener('click', e => { if (!e.target.closest('.water-picker') && !e.target.closest('#cesiumContainer')) hideWaterPicker(); });
+        function addWaterSource(type, name, lon, lat) { const id = `water-${++waterIdCounter}`; const w = { id, type, name, lon, lat }; waterSources.push(w); const e = viewer.entities.add({ id: id, position: Cesium.Cartesian3.fromDegrees(lon, lat), billboard: { image: createWaterIcon(type), width: 28, height: 28, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND } }); waterEntities.push(e); saveAllData(); return id; }
+        function createWaterIcon(type) { const c = document.createElement('canvas'); c.width = 28; c.height = 28; const ctx = c.getContext('2d'); ctx.beginPath(); ctx.arc(14, 14, 12, 0, Math.PI * 2); ctx.fillStyle = waterTypeColors[type] || '#2196f3'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = 'white'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const icons = { hydrant: '💧', tank: '🪣', natural: '🌊', other: '💧' }; ctx.fillText(icons[type] || '💧', 14, 14); return c.toDataURL(); }
+        function selectWater(id) { const w = waterSources.find(s => s.id === id); if (!w) return; closeAllPanels(); selectedWater = w; document.getElementById('waterType').textContent = waterTypeNames[w.type] || w.type; document.getElementById('waterLat').textContent = w.lat.toFixed(6) + '°'; document.getElementById('waterLon').textContent = w.lon.toFixed(6) + '°'; document.getElementById('waterPanel').classList.add('active'); }
+        function deleteSelectedWater() { if (!selectedWater) return; const idx = waterSources.findIndex(s => s.id === selectedWater.id); if (idx >= 0) { waterSources.splice(idx, 1); viewer.entities.remove(waterEntities[idx]); waterEntities.splice(idx, 1); } document.getElementById('waterPanel').classList.remove('active'); selectedWater = null; saveAllData(); }
 
         // ホース延長
         let hosePoints = [], hoseMarkers = [], hoseLine = null, confirmedLines = [], selectedHoseLine = null;
         const hoseSimState = { markersByLineId: new Map(), relayMarkersByLine: new Map(), colorizedLinesByLine: new Map(), startEndMarkersByLine: new Map() };
         const hoseParams = { pumpOutputMPa: 1.2, relayOutputMPa: 0.8, minInletPressureMPa: 0.15, nozzleRequiredMPa: 0.4, lossPerHoseMPa: 0.02, hoseLengthM: 20 };
+        
+        // データ永続化
+        function saveAllData() {
+            try {
+                const data = {
+                    firePoints: firePoints.map(p => ({ id: p.id, lon: p.lon, lat: p.lat, height: p.height })),
+                    waterSources: waterSources.map(w => ({ id: w.id, type: w.type, name: w.name, lon: w.lon, lat: w.lat })),
+                    confirmedLines: confirmedLines.map(l => ({ id: l.id, points: l.points.map(p => ({ lon: p.lon, lat: p.lat, height: p.height })) })),
+                    counters: { fire: firePointIdCounter, water: waterIdCounter }
+                };
+                localStorage.setItem('hosecalc_data', JSON.stringify(data));
+            } catch(e) { console.warn('Save failed:', e); }
+        }
+        function restoreAllData() {
+            try {
+                const raw = localStorage.getItem('hosecalc_data');
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (data.counters) { firePointIdCounter = data.counters.fire || 0; waterIdCounter = data.counters.water || 0; }
+                (data.firePoints || []).forEach(p => { addFirePoint(p.lon, p.lat, p.height); });
+                (data.waterSources || []).forEach(w => { addWaterSource(w.type, w.name, w.lon, w.lat); });
+                (data.confirmedLines || []).forEach(l => {
+                    const lineId = l.id;
+                    confirmedLines.push({ id: lineId, points: l.points.map(p => ({ lon: p.lon, lat: p.lat, height: p.height })) });
+                    const pathLLH = l.points.map(p => ({ lon: p.lon, lat: p.lat, height: p.height }));
+                    runSimulationForLine(lineId, pathLLH);
+                });
+                if (data.firePoints.length || data.waterSources.length || data.confirmedLines.length) {
+                    showToast('前回のデータを復元しました');
+                }
+                viewer.scene.requestRender();
+            } catch(e) { console.warn('Restore failed:', e); }
+        }
         
         function addHosePoint(lon, lat, height, cartesian) { 
             hosePoints.push({ lon, lat, height, cartesian }); 
@@ -601,6 +719,7 @@
             document.getElementById('hoseInfoPanel').classList.add('active');
             clearTool();
             viewer.scene.requestRender();
+            saveAllData();
             showToast('シミュレーション完了');
         }
         function selectHoseLine(id) { 
@@ -620,6 +739,7 @@
             document.getElementById('hoseInfoPanel').classList.remove('active'); 
             selectedHoseLine = null; 
             viewer.scene.requestRender();
+            saveAllData();
         }
         function clearSimulationVisuals(lineId) { 
             (hoseSimState.markersByLineId.get(lineId) || []).forEach(e => viewer.entities.remove(e)); 
@@ -789,7 +909,7 @@
             }, 100);
         }
         function interpolatePath(points, interval) { const result = []; let cumulative = 0; result.push({ ...points[0], distFromStart: 0 }); for (let i = 1; i < points.length; i++) { const p1 = points[i - 1], p2 = points[i]; const segDist = geodesicDistance(p1.lon, p1.lat, p2.lon, p2.lat); const segElev = (p2.height || 0) - (p1.height || 0); const steps = Math.ceil(segDist / interval); for (let s = 1; s <= steps; s++) { const t = s / steps; cumulative += segDist / steps; result.push({ lon: p1.lon + (p2.lon - p1.lon) * t, lat: p1.lat + (p2.lat - p1.lat) * t, height: (p1.height || 0) + segElev * t, distFromStart: cumulative }); } } return result; }
-        function calcLossForDistance(dist, dh, params) { const hoses = dist / params.hoseLengthM; const frictionLoss = hoses * params.lossPerHoseMPa; const elevLoss = dh > 0 ? dh * 0.01 : dh * 0.01 / 3; return frictionLoss + elevLoss; }
+        function calcLossForDistance(dist, dh, params) { const hoses = dist / params.hoseLengthM; const frictionLoss = hoses * params.lossPerHoseMPa; const elevLoss = dh * 0.01; return frictionLoss + elevLoss; }
         function computeRelayPositionsInterpolated(interpolated, params) { const relays = []; let currentPressure = params.pumpOutputMPa; let lastRelayIdx = 0; for (let i = 1; i < interpolated.length; i++) { const dist = interpolated[i].distFromStart - interpolated[lastRelayIdx].distFromStart; const dh = interpolated[i].height - interpolated[lastRelayIdx].height; const loss = calcLossForDistance(dist, dh, params); const remain = currentPressure - loss; if (remain < params.minInletPressureMPa) { const relayIdx = i - 1 > lastRelayIdx ? i - 1 : i; relays.push({ index: relayIdx, lon: interpolated[relayIdx].lon, lat: interpolated[relayIdx].lat, height: interpolated[relayIdx].height }); lastRelayIdx = relayIdx; currentPressure = params.relayOutputMPa; } } return relays; }
         function computePumpSegmentsFromRelays(interpolated, relays, params) { const segments = []; const relayIndices = [0, ...relays.map(r => r.index)]; for (let p = 0; p < relayIndices.length; p++) { const startIdx = relayIndices[p]; const endIdx = p < relayIndices.length - 1 ? relayIndices[p + 1] : interpolated.length - 1; const dist = interpolated[endIdx].distFromStart - interpolated[startIdx].distFromStart; const dh = interpolated[endIdx].height - interpolated[startIdx].height; const hoses = Math.ceil(dist / params.hoseLengthM); const loss = calcLossForDistance(dist, dh, params); const outputP = p === 0 ? params.pumpOutputMPa : params.relayOutputMPa; const remain = outputP - loss; const pumpLabel = p === 0 ? '消防車' : `P${p + 1}`; const nextLabel = p < relayIndices.length - 1 ? `P${p + 2}` : '筒先'; segments.push({ pumpLabel, nextLabel, distance: dist, hoses, elevation: dh, loss, remainingPressure: remain }); } return segments; }
         function runSimulationForLine(lineId, pathLLH) { hoseParams.pumpOutputMPa = parseFloat(document.getElementById('paramPumpOut').value) || 1.2; hoseParams.relayOutputMPa = parseFloat(document.getElementById('paramRelayOut').value) || 0.8; hoseParams.minInletPressureMPa = parseFloat(document.getElementById('paramInlet').value) || 0.15; hoseParams.nozzleRequiredMPa = parseFloat(document.getElementById('paramNozzle').value) || 0.4; hoseParams.lossPerHoseMPa = parseFloat(document.getElementById('paramLossPerHose').value) || 0.02; clearSimulationVisuals(lineId); const interpolated = interpolatePath(pathLLH, 10); const relays = computeRelayPositionsInterpolated(interpolated, hoseParams); const pumpSegments = computePumpSegmentsFromRelays(interpolated, relays, hoseParams); let totalDist = interpolated[interpolated.length - 1].distFromStart; const totalHoses = Math.ceil(totalDist / hoseParams.hoseLengthM); const endPressure = pumpSegments.length > 0 ? pumpSegments[pumpSegments.length - 1].remainingPressure : hoseParams.pumpOutputMPa; renderStartEndMarkers(lineId, pathLLH); renderRelayMarkersFromPositions(lineId, relays); renderColorizedByPumpSegments(lineId, interpolated, relays, pumpSegments); updateHoseInfoPanel({ totalLengthM: totalDist, totalHoses20m: totalHoses, endPressureMPa: endPressure, totalPumps: relays.length + 1, pumpSegments }); viewer.scene.requestRender(); }
@@ -899,7 +1019,7 @@
             let height = 0; 
             try { const u = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [Cesium.Cartographic.fromDegrees(lon, lat)]); height = u[0].height || 0; } catch(e) { height = carto.height || 0; } 
             if (currentTool === 'fire') { const id = addFirePoint(lon, lat, height); selectFirePoint(id); } 
-            else if (currentTool === 'water') { const id = addWaterSource('hydrant', `消火栓#${waterIdCounter + 1}`, lon, lat); selectWater(id); } 
+            else if (currentTool === 'water') { pendingWaterCoords = { lon, lat }; showWaterPicker(click.position.x, click.position.y); } 
             else if (currentTool === 'hose') { addHosePoint(lon, lat, height, cartesian); } 
             else if (currentTool === 'measure') { if (measurePoints.length >= 2) resetMeasure(); addMeasurePoint(lon, lat, height, cartesian); } 
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);

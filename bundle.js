@@ -140,6 +140,8 @@ var HoseCalc = (() => {
   function clearTool() {
     state_default.currentTool = null;
     document.getElementById("modeIndicator").className = "mode-indicator";
+    const hint = document.getElementById("modeHint");
+    if (hint) hint.textContent = "";
     document.getElementById("hosePanel").classList.remove("active");
     document.getElementById("measurePanel").classList.remove("active");
   }

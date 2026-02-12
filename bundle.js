@@ -685,7 +685,7 @@ var HoseCalc = (() => {
     if (!hasTrails) {
       state_default.traceGuideStep = "trails";
       if (!state_default.layers.trails) toggleMapLayer("trails");
-      showStepBanner("hiking", "\u9053\u8DEF\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
+      showStepBanner("hiking", "\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
     } else {
       goToFireStep();
     }
@@ -773,12 +773,12 @@ var HoseCalc = (() => {
     const nearFire = findNearestNode(fire.lon, fire.lat, 1e3);
     if (!nearWater) {
       showLoading(false);
-      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u9053\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      showToast("\u6C34\u5229\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
       return;
     }
     if (!nearFire) {
       showLoading(false);
-      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u9053\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
+      showToast("\u706B\u70B9\u306E\u8FD1\u304F\u306B\u767B\u5C71\u9053\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF081km\u4EE5\u5185\uFF09");
       return;
     }
     showLoading(true, "\u30C0\u30A4\u30AF\u30B9\u30C8\u30E9\u63A2\u7D22\u4E2D...", 40);
@@ -817,7 +817,7 @@ var HoseCalc = (() => {
     }
     showLoading(false);
     const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
-    showToast(`\u30EB\u30FC\u30C8\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
+    showToast(`\u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
     state_default.traceFire = null;
     state_default.traceWater = null;
     state_default.viewer.scene.requestRender();
@@ -872,106 +872,112 @@ var HoseCalc = (() => {
       if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
       return;
     }
-    const c = state_default.viewer.camera.positionCartographic;
-    const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
-    const radius = TRAIL_RADIUS;
     state_default.trailLoadActive = true;
-    showLoading(true, "\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D...", 30);
-    let success = false;
-    for (const server of OVERPASS_SERVERS) {
-      if (success) break;
-      try {
-        const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
-        const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25e3);
-        showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...", 50);
-        const res = await fetch(server, {
-          method: "POST",
-          body: "data=" + encodeURIComponent(query),
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (!res.ok) continue;
-        showLoading(true, "\u30C7\u30FC\u30BF\u3092\u51E6\u7406\u4E2D...", 70);
-        const data = await res.json();
-        if (!data.elements) continue;
-        const ways = data.elements.filter((e) => e.type === "way" && e.geometry);
-        let newNodes = 0, newEdges = 0;
-        const wayEndpoints = [];
-        ways.forEach((way) => {
-          const geom = way.geometry;
-          const nodeIds = way.nodes || [];
-          for (let i = 0; i < geom.length; i++) {
-            const nid = nodeIds[i] || `${way.id}-${i}`;
-            const { lon: lon2, lat: lat2 } = geom[i];
-            if (!trailGraph.nodes.has(nid)) {
-              trailGraph.nodes.set(nid, { lon: lon2, lat: lat2 });
-              newNodes++;
+    try {
+      const c = state_default.viewer.camera.positionCartographic;
+      const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
+      const radius = TRAIL_RADIUS;
+      showLoading(true, "\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u3092\u8AAD\u307F\u8FBC\u307F\u4E2D...", 30);
+      let success = false;
+      for (const server of OVERPASS_SERVERS) {
+        if (success) break;
+        try {
+          const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
+          const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 25e3);
+          showLoading(true, "\u30B5\u30FC\u30D0\u30FC\u306B\u63A5\u7D9A\u4E2D...", 50);
+          const res = await fetch(server, {
+            method: "POST",
+            body: "data=" + encodeURIComponent(query),
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (!res.ok) continue;
+          showLoading(true, "\u30C7\u30FC\u30BF\u3092\u51E6\u7406\u4E2D...", 70);
+          const data = await res.json();
+          if (!data.elements) continue;
+          const ways = data.elements.filter((e) => e.type === "way" && e.geometry);
+          let newNodes = 0, newEdges = 0;
+          const wayEndpoints = [];
+          ways.forEach((way) => {
+            const geom = way.geometry;
+            const nodeIds = way.nodes || [];
+            for (let i = 0; i < geom.length; i++) {
+              const nid = nodeIds[i] || `${way.id}-${i}`;
+              const { lon: lon2, lat: lat2 } = geom[i];
+              if (!trailGraph.nodes.has(nid)) {
+                trailGraph.nodes.set(nid, { lon: lon2, lat: lat2 });
+                newNodes++;
+              }
+              if (i > 0) {
+                const prev = nodeIds[i - 1] || `${way.id}-${i - 1}`;
+                const existing = trailGraph.edges.get(prev);
+                if (!existing || !existing.some((e) => e.to === nid)) {
+                  const dist = haversineDistance(geom[i - 1].lon, geom[i - 1].lat, lon2, lat2);
+                  addEdge(prev, nid, dist);
+                  newEdges++;
+                }
+              }
             }
-            if (i > 0) {
-              const prev = nodeIds[i - 1] || `${way.id}-${i - 1}`;
-              const existing = trailGraph.edges.get(prev);
-              if (!existing || !existing.some((e) => e.to === nid)) {
-                const dist = haversineDistance(geom[i - 1].lon, geom[i - 1].lat, lon2, lat2);
-                addEdge(prev, nid, dist);
-                newEdges++;
+            if (geom.length >= 2) {
+              wayEndpoints.push(
+                nodeIds[0] || `${way.id}-0`,
+                nodeIds[geom.length - 1] || `${way.id}-${geom.length - 1}`
+              );
+            }
+          });
+          const BRIDGE_MAX_M = 25;
+          let bridgeCount = 0;
+          const uniqueEndpoints = [...new Set(wayEndpoints)];
+          for (let i = 0; i < uniqueEndpoints.length; i++) {
+            const a = uniqueEndpoints[i];
+            const nodeA = trailGraph.nodes.get(a);
+            if (!nodeA) continue;
+            for (let j = i + 1; j < uniqueEndpoints.length; j++) {
+              const b = uniqueEndpoints[j];
+              const nodeB = trailGraph.nodes.get(b);
+              if (!nodeB) continue;
+              const edgesA = trailGraph.edges.get(a);
+              if (edgesA && edgesA.some((e) => e.to === b)) continue;
+              const dist = haversineDistance(nodeA.lon, nodeA.lat, nodeB.lon, nodeB.lat);
+              if (dist <= BRIDGE_MAX_M) {
+                addEdge(a, b, dist);
+                bridgeCount++;
               }
             }
           }
-          if (geom.length >= 2) {
-            wayEndpoints.push(
-              nodeIds[0] || `${way.id}-0`,
-              nodeIds[geom.length - 1] || `${way.id}-${geom.length - 1}`
-            );
-          }
-        });
-        const BRIDGE_MAX_M = 25;
-        let bridgeCount = 0;
-        const uniqueEndpoints = [...new Set(wayEndpoints)];
-        for (let i = 0; i < uniqueEndpoints.length; i++) {
-          const a = uniqueEndpoints[i];
-          const nodeA = trailGraph.nodes.get(a);
-          if (!nodeA) continue;
-          for (let j = i + 1; j < uniqueEndpoints.length; j++) {
-            const b = uniqueEndpoints[j];
-            const nodeB = trailGraph.nodes.get(b);
-            if (!nodeB) continue;
-            const edgesA = trailGraph.edges.get(a);
-            if (edgesA && edgesA.some((e) => e.to === b)) continue;
-            const dist = haversineDistance(nodeA.lon, nodeA.lat, nodeB.lon, nodeB.lat);
-            if (dist <= BRIDGE_MAX_M) {
-              addEdge(a, b, dist);
-              bridgeCount++;
+          showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
+          ways.forEach((way) => {
+            if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
+            const pos = way.geometry.map((g) => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
+            if (pos.length >= 2) {
+              const e = state_default.viewer.entities.add({ polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true } });
+              e.show = state_default.layers.trails;
+              e.osmId = way.id;
+              state_default.trailEntities.push(e);
             }
-          }
+          });
+          state_default.viewer.scene.requestRender();
+          showLoading(true, "\u5B8C\u4E86", 100);
+          console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(\u226425m)`);
+          if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
+          else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
+          success = true;
+          if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
+        } catch (e) {
+          console.log("Trail server failed:", server, e.message);
         }
-        showLoading(true, `${ways.length}\u672C\u306E\u767B\u5C71\u9053\u3092\u63CF\u753B\u4E2D...`, 85);
-        ways.forEach((way) => {
-          if (state_default.trailEntities.some((e) => e.osmId === way.id)) return;
-          const pos = way.geometry.map((g) => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
-          if (pos.length >= 2) {
-            const e = state_default.viewer.entities.add({ polyline: { positions: pos, width: 3, material: Cesium.Color.LIGHTGREEN.withAlpha(0.8), clampToGround: true } });
-            e.show = state_default.layers.trails;
-            e.osmId = way.id;
-            state_default.trailEntities.push(e);
-          }
-        });
-        state_default.viewer.scene.requestRender();
-        showLoading(true, "\u5B8C\u4E86", 100);
-        console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(\u226425m)`);
-        if (ways.length > 0) showToast(`\u767B\u5C71\u9053 ${ways.length}\u672C\uFF08${trailGraph.nodes.size}\u30CE\u30FC\u30C9${bridgeCount > 0 ? ", " + bridgeCount + "\u7B87\u6240\u81EA\u52D5\u63A5\u7D9A" : ""}\uFF09`);
-        else showToast("\u3053\u306E\u7BC4\u56F2\u306B\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093");
-        success = true;
-        if (state_default.traceGuideActive) Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.updateTraceGuide());
-      } catch (e) {
-        console.log("Trail server failed:", server, e.message);
       }
+      if (!success) showToast("\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\uFF08\u5F8C\u3067\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\uFF09");
+    } catch (e) {
+      console.error("loadTrails error:", e);
+      showToast("\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557");
+    } finally {
+      state_default.trailLoadActive = false;
+      setTimeout(() => showLoading(false), 300);
     }
-    if (!success) showToast("\u767B\u5C71\u9053\u30C7\u30FC\u30BF\u306E\u8AAD\u307F\u8FBC\u307F\u306B\u5931\u6557\uFF08\u5F8C\u3067\u518D\u8A66\u884C\u3057\u3066\u304F\u3060\u3055\u3044\uFF09");
-    state_default.trailLoadActive = false;
-    setTimeout(() => showLoading(false), 300);
   }
   function findNearestNode(lon, lat, maxDistM = 500) {
     let bestId = null, bestDist = Infinity;

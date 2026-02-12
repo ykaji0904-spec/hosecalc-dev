@@ -225,11 +225,9 @@ var HoseCalc = (() => {
         </div>
         <div class="guide-steps">
             ${steps.map((s, i) => `
-                <div class="guide-step ${s.done ? "done" : ""} ${s.active ? "active" : ""}"
-                     ${s.action ? `onclick="${s.action}" style="cursor:pointer"` : ""}>
+                <div class="guide-step ${s.done ? "done" : ""} ${s.active ? "active" : ""}">
                     <span class="guide-num">${s.done ? "\u2713" : i + 1}</span>
                     <span class="guide-label">${s.label}</span>
-                    ${s.active && s.action ? '<span class="material-icons" style="font-size:14px;margin-left:2px">touch_app</span>' : ""}
                 </div>
             `).join('<div class="guide-arrow">\u2192</div>')}
         </div>
@@ -656,32 +654,73 @@ var HoseCalc = (() => {
     const hasTrails = trailGraph.nodes.size > 0;
     const hasWater = state_default.waterSources.length > 0;
     const hasFire = state_default.firePoints.length > 0;
+    showGuideBanner([
+      { label: "\u767B\u5C71\u9053\u8AAD\u307F\u8FBC\u307F\u4E2D...", done: hasTrails, active: !hasTrails },
+      { label: "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: hasWater, active: hasTrails && !hasWater },
+      { label: "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: hasFire, active: hasTrails && hasWater && !hasFire },
+      { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: hasTrails && hasWater && hasFire }
+    ]);
     if (hasTrails && hasWater && hasFire) {
       state_default.traceGuideActive = false;
       hideGuideBanner();
+      clearTool();
       setTimeout(() => executeTrace(), 300);
       return;
     }
-    showGuideBanner([
-      { label: "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3080", done: hasTrails, active: !hasTrails, action: !hasTrails ? "toggleMapLayer('trails')" : null },
-      { label: "\u6C34\u5229\u3092\u767B\u9332", done: hasWater, active: hasTrails && !hasWater, action: hasTrails && !hasWater ? "setOperation('water')" : null },
-      { label: "\u706B\u70B9\u3092\u767B\u9332", done: hasFire, active: hasTrails && hasWater && !hasFire, action: hasTrails && hasWater && !hasFire ? "setOperation('fire')" : null },
-      { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
-    ]);
+    if (hasTrails && !hasWater) {
+      activateTool("water", "water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "water-mode");
+    } else if (hasTrails && hasWater && !hasFire) {
+      activateTool("fire", "local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "");
+    }
+  }
+  function activateTool(tool, icon, label, modeClass) {
+    clearTool();
+    state_default.currentTool = tool;
+    const ind = document.getElementById("modeIndicator");
+    const ic = document.getElementById("modeIcon");
+    const tx = document.getElementById("modeText");
+    ic.textContent = icon;
+    tx.textContent = label;
+    ind.className = "mode-indicator show " + modeClass;
+    updateLayerCards();
   }
   async function traceTrailRoute() {
     closeSidePanel();
     const hasTrails = trailGraph.nodes.size > 0;
     const hasWater = state_default.waterSources.length > 0;
     const hasFire = state_default.firePoints.length > 0;
-    if (!hasTrails || !hasWater || !hasFire) {
-      state_default.traceGuideActive = true;
-      updateTraceGuide();
+    if (hasTrails && hasWater && hasFire) {
+      await executeTrace();
       return;
     }
-    hideGuideBanner();
-    state_default.traceGuideActive = false;
-    await executeTrace();
+    state_default.traceGuideActive = true;
+    if (!hasTrails) {
+      if (!state_default.layers.trails) {
+        toggleMapLayer("trails");
+      }
+      showGuideBanner([
+        { label: "\u767B\u5C71\u9053\u8AAD\u307F\u8FBC\u307F\u4E2D...", done: false, active: true },
+        { label: "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: hasWater, active: false },
+        { label: "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: hasFire, active: false },
+        { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
+      ]);
+    } else if (!hasWater) {
+      activateTool("water", "water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "water-mode");
+      showGuideBanner([
+        { label: "\u767B\u5C71\u9053\u8AAD\u307F\u8FBC\u307F", done: true, active: false },
+        { label: "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: false, active: true },
+        { label: "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: hasFire, active: false },
+        { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
+      ]);
+    } else {
+      activateTool("fire", "local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", "");
+      showGuideBanner([
+        { label: "\u767B\u5C71\u9053\u8AAD\u307F\u8FBC\u307F", done: true, active: false },
+        { label: "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: true, active: false },
+        { label: "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7", done: false, active: true },
+        { label: "\u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", done: false, active: false }
+      ]);
+    }
   }
   async function executeTrace() {
     showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
@@ -725,12 +764,9 @@ var HoseCalc = (() => {
     showLoading(true, "\u30DB\u30FC\u30B9\u30E9\u30A4\u30F3\u3092\u751F\u6210\u4E2D...", 90);
     clearTool();
     state_default.currentTool = "hose";
-    const ind = document.getElementById("modeIndicator");
-    const icon = document.getElementById("modeIcon");
-    const text = document.getElementById("modeText");
-    icon.textContent = "route";
-    text.textContent = "\u30DB\u30FC\u30B9\u5EF6\u9577";
-    ind.className = "mode-indicator show hose-mode";
+    document.getElementById("modeIcon").textContent = "route";
+    document.getElementById("modeText").textContent = "\u30DB\u30FC\u30B9\u5EF6\u9577";
+    document.getElementById("modeIndicator").className = "mode-indicator show hose-mode";
     document.getElementById("hosePanel").classList.add("active");
     resetHoseLine();
     for (const p of simplified) {
@@ -760,7 +796,7 @@ var HoseCalc = (() => {
       init_trails();
       init_hose();
       init_ui();
-      init_utils();
+      init_map();
     }
   });
 
@@ -926,13 +962,7 @@ var HoseCalc = (() => {
     }
   });
 
-  // js/app.js
-  init_state();
-
   // js/map.js
-  init_state();
-  init_config();
-  init_ui();
   function initViewer() {
     console.log("[HoseCalc:map] Setting Cesium Ion token...");
     Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
@@ -1171,8 +1201,17 @@ var HoseCalc = (() => {
       }, { timeout: 1e4 });
     }
   }
+  var init_map = __esm({
+    "js/map.js"() {
+      init_state();
+      init_config();
+      init_ui();
+    }
+  });
 
   // js/app.js
+  init_state();
+  init_map();
   init_ui();
 
   // js/fire.js

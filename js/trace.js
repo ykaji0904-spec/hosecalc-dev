@@ -21,9 +21,9 @@ export function updateTraceGuide() {
     }
 
     showGuideBanner([
-        { label: '登山道を読み込む', done: hasTrails, active: !hasTrails },
-        { label: '水利を登録', done: hasWater, active: hasTrails && !hasWater },
-        { label: '火点を登録', done: hasFire, active: hasTrails && hasWater && !hasFire },
+        { label: '登山道を読み込む', done: hasTrails, active: !hasTrails, action: !hasTrails ? "toggleMapLayer('trails')" : null },
+        { label: '水利を登録', done: hasWater, active: hasTrails && !hasWater, action: hasTrails && !hasWater ? "setOperation('water')" : null },
+        { label: '火点を登録', done: hasFire, active: hasTrails && hasWater && !hasFire, action: hasTrails && hasWater && !hasFire ? "setOperation('fire')" : null },
         { label: 'トレース実行', done: false, active: false }
     ]);
 }

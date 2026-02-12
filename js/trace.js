@@ -4,7 +4,7 @@ import { addHosePoint, resetHoseLine } from './hose.js';
 import { showLoading, showToast, clearTool, closeSidePanel, hideGuideBanner, updateLayerCards } from './ui.js';
 import { toggleMapLayer } from './map.js';
 
-// シンプルなガイドバナー表示（1行メッセージ）
+// --- バナー表示 ---
 function showStepBanner(icon, message, actionLabel, actionFn) {
     let el = document.getElementById('guideBanner');
     if (!el) {
@@ -37,84 +37,122 @@ function activateTool(tool, iconName, label, modeClass, hintText) {
     updateLayerCards();
 }
 
-// ガイド更新（他モジュールから呼ばれる）
-export function updateTraceGuide() {
-    if (!S.traceGuideActive) return;
+// --- トレースボタン押下（毎回火点→水利の選択から開始）---
+export async function traceTrailRoute() {
+    closeSidePanel();
+    clearTool();
+
+    // トレース用の選択をリセット
+    S.traceFire = null;
+    S.traceWater = null;
+    S.traceGuideActive = true;
 
     const hasTrails = trailGraph.nodes.size > 0;
-    const hasWater = S.waterSources.length > 0;
-    const hasFire = S.firePoints.length > 0;
-
     if (!hasTrails) {
+        S.traceGuideStep = 'trails';
+        if (!S.layers.trails) toggleMapLayer('trails');
         showStepBanner('hiking', '登山道を読み込んでいます...');
-        return;
+    } else {
+        goToFireStep();
     }
+}
 
-    if (!hasFire) {
-        activateTool('fire', 'local_fire_department', '火点追加', '', '地図をタップして火点を登録');
+// --- Step: 火点選択/追加 ---
+function goToFireStep() {
+    S.traceGuideStep = 'fire';
+    activateTool('fire', 'local_fire_department', '火点選択', '', '地図タップで新規追加、または既存の火点をタップ');
+    if (S.firePoints.length > 0) {
+        showStepBanner('local_fire_department', '火点を選択、または地図タップで新規追加');
+    } else {
         showStepBanner('local_fire_department', '火点を地図にタップして追加してください');
-        return;
     }
+}
 
-    if (!hasWater) {
-        activateTool('water', 'water_drop', '水利追加', 'water-mode', '地図をタップして水源を登録');
+// --- Step: 水利選択/追加 ---
+function goToWaterStep() {
+    S.traceGuideStep = 'water';
+    activateTool('water', 'water_drop', '水利選択', 'water-mode', '地図タップで新規追加、または既存の水利をタップ');
+    if (S.waterSources.length > 0) {
+        showStepBanner('water_drop', '水利を選択、または地図タップで新規追加');
+    } else {
         showStepBanner('water_drop', '水利を地図にタップして追加してください');
-        return;
     }
+}
 
-    // 全条件揃った
+// --- Step: 準備完了 ---
+function goToReadyStep() {
+    S.traceGuideStep = null;
     S.traceGuideActive = false;
     clearTool();
     showStepBanner('route', '準備完了', '▶ トレース実行', '_execTrace()');
 }
 
-// トレースボタン押下
-export async function traceTrailRoute() {
-    closeSidePanel();
-    clearTool();
+// --- 他モジュールからの通知（新規追加時）---
+export function updateTraceGuide() {
+    if (!S.traceGuideActive) return;
+    const step = S.traceGuideStep;
 
-    const hasTrails = trailGraph.nodes.size > 0;
-    const hasWater = S.waterSources.length > 0;
-    const hasFire = S.firePoints.length > 0;
-
-    if (hasTrails && hasWater && hasFire) {
-        showStepBanner('route', '準備完了', '▶ トレース実行', '_execTrace()');
+    if (step === 'trails') {
+        if (trailGraph.nodes.size > 0) goToFireStep();
         return;
     }
 
-    // ガイドモードON
-    S.traceGuideActive = true;
+    if (step === 'fire') {
+        const last = S.firePoints[S.firePoints.length - 1];
+        if (last) {
+            S.traceFire = { lon: last.lon, lat: last.lat, height: last.height };
+            showToast('火点を選択しました');
+            goToWaterStep();
+        }
+        return;
+    }
 
-    if (!hasTrails) {
-        if (!S.layers.trails) toggleMapLayer('trails');
-        showStepBanner('hiking', '登山道を読み込んでいます...');
-    } else if (!hasFire) {
-        activateTool('fire', 'local_fire_department', '火点追加', '', '地図をタップして火点を登録');
-        showStepBanner('local_fire_department', '火点を地図にタップして追加してください');
-    } else {
-        activateTool('water', 'water_drop', '水利追加', 'water-mode', '地図をタップして水源を登録');
-        showStepBanner('water_drop', '水利を地図にタップして追加してください');
+    if (step === 'water') {
+        const last = S.waterSources[S.waterSources.length - 1];
+        if (last) {
+            S.traceWater = { lon: last.lon, lat: last.lat };
+            showToast('水利を選択しました');
+            goToReadyStep();
+        }
+        return;
     }
 }
 
-// 実行ラッパー（window公開用）
+// --- 既存ポイントタップ時（fire.js / water.js から呼ばれる）---
+export function traceSelectFire(fp) {
+    if (!S.traceGuideActive || S.traceGuideStep !== 'fire') return false;
+    S.traceFire = { lon: fp.lon, lat: fp.lat, height: fp.height };
+    showToast('火点を選択しました');
+    goToWaterStep();
+    return true;
+}
+
+export function traceSelectWater(ws) {
+    if (!S.traceGuideActive || S.traceGuideStep !== 'water') return false;
+    S.traceWater = { lon: ws.lon, lat: ws.lat };
+    showToast('水利を選択しました');
+    goToReadyStep();
+    return true;
+}
+
+// --- 実行 ---
 export async function execTrace() {
     hideGuideBanner();
     await executeTrace();
 }
 
-// トレース実行
 async function executeTrace() {
     hideGuideBanner();
     S.traceGuideActive = false;
+    S.traceGuideStep = null;
+
+    const fire = S.traceFire;
+    const water = S.traceWater;
+    if (!fire || !water) { showToast('火点と水利を選択してください'); return; }
+
     showLoading(true, '最適ルートを探索中...', 20);
-
-    const water = S.waterSources[S.waterSources.length - 1];
-    const fire = S.firePoints[S.firePoints.length - 1];
-
     const nearWater = findNearestNode(water.lon, water.lat, 1000);
     const nearFire = findNearestNode(fire.lon, fire.lat, 1000);
-
     if (!nearWater) { showLoading(false); showToast('水利の近くに登山道が見つかりません（1km以内）'); return; }
     if (!nearFire) { showLoading(false); showToast('火点の近くに登山道が見つかりません（1km以内）'); return; }
 
@@ -122,8 +160,7 @@ async function executeTrace() {
     const result = dijkstra(nearWater.id, nearFire.id);
     if (!result) { showLoading(false); showToast('水利→火点の経路が見つかりません（道がつながっていない可能性）'); return; }
 
-    showLoading(true, `ルート発見（${result.path.length}点, ${(result.totalDist / 1000).toFixed(1)}km）標高取得中...`, 60);
-
+    showLoading(true, `ルート発見（${result.path.length}点, ${(result.totalDist / 1000).toFixed(1)}km）`, 60);
     const fullPath = [{ lon: water.lon, lat: water.lat }];
     fullPath.push(...result.path);
     fullPath.push({ lon: fire.lon, lat: fire.lat });
@@ -134,9 +171,7 @@ async function executeTrace() {
     try {
         const updated = await Cesium.sampleTerrainMostDetailed(S.viewer.terrainProvider, cartographics);
         for (let i = 0; i < simplified.length; i++) simplified[i].height = updated[i].height || 0;
-    } catch (e) {
-        simplified.forEach(p => p.height = p.height || 0);
-    }
+    } catch (e) { simplified.forEach(p => p.height = p.height || 0); }
 
     showLoading(true, 'ホースラインを生成中...', 90);
     clearTool();
@@ -157,6 +192,8 @@ async function executeTrace() {
     showLoading(false);
     const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
     showToast(`登山道トレース完了（${(totalDist / 1000).toFixed(1)}km, ${simplified.length}点）→「確定」でシミュレーション`);
+    S.traceFire = null;
+    S.traceWater = null;
     S.viewer.scene.requestRender();
 }
 

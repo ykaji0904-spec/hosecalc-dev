@@ -105,6 +105,8 @@ export async function execTrace() {
 
 // トレース実行
 async function executeTrace() {
+    hideGuideBanner();
+    S.traceGuideActive = false;
     showLoading(true, '最適ルートを探索中...', 20);
 
     const water = S.waterSources[S.waterSources.length - 1];

@@ -86,6 +86,43 @@ async function restoreData() {
     } finally { S.isRestoring = false; }
 }
 
+// === リセット機能 ===
+function clearSimResults() {
+    if (!confirm('シミュレーション結果（ホースライン）をすべて削除しますか？')) return;
+    // 全confirmedLinesのビジュアルを削除
+    S.confirmedLines.forEach(l => clearSimulationVisuals(l.id));
+    S.confirmedLines = [];
+    // 未確定ホースラインもクリア
+    resetHoseLine();
+    document.getElementById('hosePanel').classList.remove('active');
+    document.getElementById('hoseInfoPanel').classList.remove('active');
+    S.selectedHoseLine = null;
+    clearTool();
+    saveAllData();
+    S.viewer.scene.requestRender();
+    showToast('シミュレーション結果をクリアしました');
+}
+
+function clearAllPoints() {
+    if (!confirm('火点・水利をすべて削除しますか？')) return;
+    // 火点削除
+    S.firePointEntities.forEach(e => S.viewer.entities.remove(e));
+    S.firePoints = [];
+    S.firePointEntities = [];
+    S.selectedFirePoint = null;
+    document.getElementById('firePanel').classList.remove('active');
+    // 水利削除
+    S.waterEntities.forEach(e => S.viewer.entities.remove(e));
+    S.waterSources = [];
+    S.waterEntities = [];
+    S.selectedWater = null;
+    document.getElementById('waterPanel').classList.remove('active');
+    clearTool();
+    saveAllData();
+    S.viewer.scene.requestRender();
+    showToast('火点・水利をすべて削除しました');
+}
+
 // === Expose to window ===
 Object.assign(window, {
     setBasemap, setViewMode, toggleMapLayer, toggleHazardLayer, goToMyLocation,
@@ -95,7 +132,8 @@ Object.assign(window, {
     undoHosePoint, resetHoseLine, closeHosePanel, confirmHoseLine, deleteSelectedHose, onParamChange,
     resetMeasure, closeMeasurePanel,
     doSearch, _flyToSearch: flyToSearch,
-    setOperation, clearAllDataConfirm, shareSimulation, traceTrailRoute, _execTrace: execTrace
+    setOperation, clearAllDataConfirm, shareSimulation, traceTrailRoute, _execTrace: execTrace,
+    clearSimResults, clearAllPoints
 });
 
 // === Boot ===

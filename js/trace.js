@@ -57,7 +57,7 @@ export async function traceTrailRoute() {
     if (!hasTrails) {
         S.traceGuideStep = 'trails';
         if (!S.layers.trails) toggleMapLayer('trails');
-        showStepBanner('hiking', '登山道を読み込んでいます...');
+        showStepBanner('hiking', '道路データを読み込んでいます...');
     } else {
         goToFireStep();
     }
@@ -159,8 +159,8 @@ async function executeTrace() {
     showLoading(true, '最適ルートを探索中...', 20);
     const nearWater = findNearestNode(water.lon, water.lat, 1000);
     const nearFire = findNearestNode(fire.lon, fire.lat, 1000);
-    if (!nearWater) { showLoading(false); showToast('水利の近くに登山道が見つかりません（1km以内）'); return; }
-    if (!nearFire) { showLoading(false); showToast('火点の近くに登山道が見つかりません（1km以内）'); return; }
+    if (!nearWater) { showLoading(false); showToast('水利の近くに道路が見つかりません（1km以内）'); return; }
+    if (!nearFire) { showLoading(false); showToast('火点の近くに道路が見つかりません（1km以内）'); return; }
 
     showLoading(true, 'ダイクストラ探索中...', 40);
     const result = dijkstra(nearWater.id, nearFire.id);
@@ -197,7 +197,7 @@ async function executeTrace() {
 
     showLoading(false);
     const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
-    showToast(`登山道トレース完了（${(totalDist / 1000).toFixed(1)}km, ${simplified.length}点）→「確定」でシミュレーション`);
+    showToast(`ルートトレース完了（${(totalDist / 1000).toFixed(1)}km, ${simplified.length}点）→「確定」でシミュレーション`);
     S.traceFire = null;
     S.traceWater = null;
     S.viewer.scene.requestRender();

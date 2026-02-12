@@ -1316,23 +1316,32 @@ var HoseCalc = (() => {
           pickedId = picked.id.id;
           entity = picked.id;
         }
-        if (pickedId.startsWith("relay-") || pickedId.startsWith("start-") || pickedId.startsWith("end-")) {
-          const data = entity.markerData || entity.relayData;
-          if (data) showMarkerInfo(data.name, data.lat, data.lon, data.height, click.position);
-          return;
-        }
-        if (pickedId.startsWith("fire-")) {
-          selectFirePoint(pickedId);
-          return;
-        }
-        if (pickedId.startsWith("water-")) {
-          selectWater(pickedId);
-          return;
-        }
-        if (pickedId.startsWith("hose-")) {
-          const lineId = pickedId.split("-seg-")[0];
-          selectHoseLine(lineId);
-          return;
+        if (state_default.currentTool === "hose" || state_default.currentTool === "measure") {
+          if (pickedId.startsWith("fire-") || pickedId.startsWith("water-")) {
+          } else if (pickedId.startsWith("relay-") || pickedId.startsWith("start-") || pickedId.startsWith("end-")) {
+            const data = entity.markerData || entity.relayData;
+            if (data) showMarkerInfo(data.name, data.lat, data.lon, data.height, click.position);
+            return;
+          }
+        } else {
+          if (pickedId.startsWith("relay-") || pickedId.startsWith("start-") || pickedId.startsWith("end-")) {
+            const data = entity.markerData || entity.relayData;
+            if (data) showMarkerInfo(data.name, data.lat, data.lon, data.height, click.position);
+            return;
+          }
+          if (pickedId.startsWith("fire-")) {
+            selectFirePoint(pickedId);
+            return;
+          }
+          if (pickedId.startsWith("water-")) {
+            selectWater(pickedId);
+            return;
+          }
+          if (pickedId.startsWith("hose-")) {
+            const lineId = pickedId.split("-seg-")[0];
+            selectHoseLine(lineId);
+            return;
+          }
         }
       }
       const ray = state_default.viewer.camera.getPickRay(click.position);

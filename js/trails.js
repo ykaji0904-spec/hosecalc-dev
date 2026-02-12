@@ -33,19 +33,18 @@ export async function loadTrails() {
     const lat = Cesium.Math.toDegrees(c.latitude), lon = Cesium.Math.toDegrees(c.longitude);
     const radius = TRAIL_RADIUS;
     S.trailLoadActive = true;
-    showLoading(true, '道路データを読み込み中...', 30);
+    showLoading(true, '登山道データを読み込み中...', 30);
 
     let success = false;
     for (const server of OVERPASS_SERVERS) {
         if (success) break;
         try {
             const bbox = `${lat - radius},${lon - radius},${lat + radius},${lon + radius}`;
-            // 登山道＋一般道路を包括的に取得（林野→市街地の接続に対応）
-            const hwTypes = 'path|track|footway|residential|unclassified|tertiary|secondary|service|living_street|pedestrian';
-            const query = `[out:json][timeout:60];(way["highway"~"^(${hwTypes})$"](${bbox}););out geom qt;`;
+            // 登山道・林道のみ取得（街中の道路は除外→レイテンシ最優先）
+            const query = `[out:json][timeout:30];(way["highway"="path"](${bbox});way["highway"="track"](${bbox}););out geom qt;`;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 55000);
-            showLoading(true, 'サーバーに接続中...（道路データ取得）', 50);
+            const timeoutId = setTimeout(() => controller.abort(), 25000);
+            showLoading(true, 'サーバーに接続中...', 50);
             const res = await fetch(server, {
                 method: 'POST', body: 'data=' + encodeURIComponent(query),
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -114,7 +113,7 @@ export async function loadTrails() {
                 }
             }
 
-            showLoading(true, `${ways.length}本の道路を描画中...`, 85);
+            showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
             ways.forEach(way => {
                 if (S.trailEntities.some(e => e.osmId === way.id)) return;
                 const pos = way.geometry.map(g => Cesium.Cartesian3.fromDegrees(g.lon, g.lat));
@@ -128,15 +127,15 @@ export async function loadTrails() {
             S.viewer.scene.requestRender();
             showLoading(true, '完了', 100);
             console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(≤25m)`);
-            if (ways.length > 0) showToast(`道路 ${ways.length}本（${trailGraph.nodes.size}ノード${bridgeCount > 0 ? ', ' + bridgeCount + '箇所自動接続' : ''}）`);
-            else showToast('この範囲に道路データがありません');
+            if (ways.length > 0) showToast(`登山道 ${ways.length}本（${trailGraph.nodes.size}ノード${bridgeCount > 0 ? ', ' + bridgeCount + '箇所自動接続' : ''}）`);
+            else showToast('この範囲に登山道データがありません');
             success = true;
             // トレースガイド更新
             if (S.traceGuideActive) import('./trace.js').then(m => m.updateTraceGuide());
         } catch (e) { console.log('Trail server failed:', server, e.message); }
     }
 
-    if (!success) showToast('道路データの読み込みに失敗（後で再試行してください）');
+    if (!success) showToast('登山道データの読み込みに失敗（後で再試行してください）');
     S.trailLoadActive = false;
     setTimeout(() => showLoading(false), 300);
 }

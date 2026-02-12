@@ -1,7 +1,7 @@
 import S from './state.js';
 import { initViewer, setBasemap, setViewMode, toggleMapLayer, toggleHazardLayer, goToMyLocation, initLocation } from './map.js';
 import { showLoading, showToast, openSidePanel, closeSidePanel, updateLayerCards, clearTool, closeAllPanels, closePanel, copyCoords, copyText, copyMarkerCoords, hideCoordPopup, hideMarkerPopup, showInfo, closeInfoModal, hideGuideBanner } from './ui.js';
-import { addFirePoint, selectFirePoint, deleteSelectedFire } from './fire.js';
+import { addFirePoint, selectFirePoint, deleteSelectedFire, updateFireArea } from './fire.js';
 import { addWaterSource, selectWater, deleteSelectedWater, showWaterPicker, hideWaterPicker, confirmWaterType } from './water.js';
 import { addHosePoint, undoHosePoint, resetHoseLine, closeHosePanel, confirmHoseLine, selectHoseLine, deleteSelectedHose, onParamChange, clearSimulationVisuals, runSimulationForLine } from './hose.js';
 import { addMeasurePoint, resetMeasure, closeMeasurePanel } from './measure.js';
@@ -111,6 +111,7 @@ function clearAllPoints() {
     S.firePointEntities = [];
     S.selectedFirePoint = null;
     document.getElementById('firePanel').classList.remove('active');
+    updateFireArea();
     // 水利削除
     S.waterEntities.forEach(e => S.viewer.entities.remove(e));
     S.waterSources = [];

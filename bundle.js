@@ -723,11 +723,16 @@ var HoseCalc = (() => {
   }
   function deleteSelectedFire() {
     if (!state_default.selectedFirePoint) return;
-    const idx = state_default.firePoints.findIndex((p) => p.id === state_default.selectedFirePoint.id);
-    if (idx >= 0) {
-      state_default.firePoints.splice(idx, 1);
-      state_default.viewer.entities.remove(state_default.firePointEntities[idx]);
-      state_default.firePointEntities.splice(idx, 1);
+    const id = state_default.selectedFirePoint.id;
+    const dataIdx = state_default.firePoints.findIndex((p) => p.id === id);
+    if (dataIdx >= 0) state_default.firePoints.splice(dataIdx, 1);
+    const entityIdx = state_default.firePointEntities.findIndex((e) => e.id === id);
+    if (entityIdx >= 0) {
+      state_default.viewer.entities.remove(state_default.firePointEntities[entityIdx]);
+      state_default.firePointEntities.splice(entityIdx, 1);
+    } else {
+      const entity = state_default.viewer.entities.getById(id);
+      if (entity) state_default.viewer.entities.remove(entity);
     }
     document.getElementById("firePanel").classList.remove("active");
     state_default.selectedFirePoint = null;
@@ -1604,11 +1609,11 @@ var HoseCalc = (() => {
   function clearAllDataConfirm() {
     closeSidePanel();
     if (!confirm("\u5168\u3066\u306E\u30C7\u30FC\u30BF\uFF08\u706B\u70B9\u30FB\u6C34\u5229\u30FB\u30DB\u30FC\u30B9\u30E9\u30A4\u30F3\uFF09\u3092\u524A\u9664\u3057\u307E\u3059\u304B\uFF1F")) return;
-    state_default.firePoints.forEach((_, i) => state_default.viewer.entities.remove(state_default.firePointEntities[i]));
+    state_default.firePointEntities.forEach((e) => state_default.viewer.entities.remove(e));
     state_default.firePoints = [];
     state_default.firePointEntities = [];
     state_default.selectedFirePoint = null;
-    state_default.waterSources.forEach((_, i) => state_default.viewer.entities.remove(state_default.waterEntities[i]));
+    state_default.waterEntities.forEach((e) => state_default.viewer.entities.remove(e));
     state_default.waterSources = [];
     state_default.waterEntities = [];
     state_default.selectedWater = null;

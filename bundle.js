@@ -96,7 +96,13 @@ var HoseCalc = (() => {
         longPressTimer: null,
         longPressStartPos: null,
         isRestoring: false,
-        traceGuideActive: false
+        traceGuideActive: false,
+        traceGuideStep: null,
+        // 'trails' | 'fire' | 'water' | null
+        traceFire: null,
+        // このトレース用の火点 {lon,lat,height}
+        traceWater: null
+        // このトレース用の水利 {lon,lat}
       };
       state_default = S;
     }
@@ -629,6 +635,8 @@ var HoseCalc = (() => {
   var trace_exports = {};
   __export(trace_exports, {
     execTrace: () => execTrace,
+    traceSelectFire: () => traceSelectFire,
+    traceSelectWater: () => traceSelectWater,
     traceTrailRoute: () => traceTrailRoute,
     updateTraceGuide: () => updateTraceGuide
   });
@@ -662,50 +670,84 @@ var HoseCalc = (() => {
     ind.className = "mode-indicator show " + modeClass;
     updateLayerCards();
   }
-  function updateTraceGuide() {
-    if (!state_default.traceGuideActive) return;
+  async function traceTrailRoute() {
+    closeSidePanel();
+    clearTool();
+    state_default.traceFire = null;
+    state_default.traceWater = null;
+    state_default.traceGuideActive = true;
     const hasTrails = trailGraph.nodes.size > 0;
-    const hasWater = state_default.waterSources.length > 0;
-    const hasFire = state_default.firePoints.length > 0;
     if (!hasTrails) {
+      state_default.traceGuideStep = "trails";
+      if (!state_default.layers.trails) toggleMapLayer("trails");
       showStepBanner("hiking", "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
-      return;
+    } else {
+      goToFireStep();
     }
-    if (!hasFire) {
-      activateTool("fire", "local_fire_department", "\u706B\u70B9\u8FFD\u52A0", "", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u706B\u70B9\u3092\u767B\u9332");
+  }
+  function goToFireStep() {
+    state_default.traceGuideStep = "fire";
+    activateTool("fire", "local_fire_department", "\u706B\u70B9\u9078\u629E", "", "\u5730\u56F3\u30BF\u30C3\u30D7\u3067\u65B0\u898F\u8FFD\u52A0\u3001\u307E\u305F\u306F\u65E2\u5B58\u306E\u706B\u70B9\u3092\u30BF\u30C3\u30D7");
+    if (state_default.firePoints.length > 0) {
+      showStepBanner("local_fire_department", "\u706B\u70B9\u3092\u9078\u629E\u3001\u307E\u305F\u306F\u5730\u56F3\u30BF\u30C3\u30D7\u3067\u65B0\u898F\u8FFD\u52A0");
+    } else {
       showStepBanner("local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
-      return;
     }
-    if (!hasWater) {
-      activateTool("water", "water_drop", "\u6C34\u5229\u8FFD\u52A0", "water-mode", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u6E90\u3092\u767B\u9332");
+  }
+  function goToWaterStep() {
+    state_default.traceGuideStep = "water";
+    activateTool("water", "water_drop", "\u6C34\u5229\u9078\u629E", "water-mode", "\u5730\u56F3\u30BF\u30C3\u30D7\u3067\u65B0\u898F\u8FFD\u52A0\u3001\u307E\u305F\u306F\u65E2\u5B58\u306E\u6C34\u5229\u3092\u30BF\u30C3\u30D7");
+    if (state_default.waterSources.length > 0) {
+      showStepBanner("water_drop", "\u6C34\u5229\u3092\u9078\u629E\u3001\u307E\u305F\u306F\u5730\u56F3\u30BF\u30C3\u30D7\u3067\u65B0\u898F\u8FFD\u52A0");
+    } else {
       showStepBanner("water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
-      return;
     }
+  }
+  function goToReadyStep() {
+    state_default.traceGuideStep = null;
     state_default.traceGuideActive = false;
     clearTool();
     showStepBanner("route", "\u6E96\u5099\u5B8C\u4E86", "\u25B6 \u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", "_execTrace()");
   }
-  async function traceTrailRoute() {
-    closeSidePanel();
-    clearTool();
-    const hasTrails = trailGraph.nodes.size > 0;
-    const hasWater = state_default.waterSources.length > 0;
-    const hasFire = state_default.firePoints.length > 0;
-    if (hasTrails && hasWater && hasFire) {
-      showStepBanner("route", "\u6E96\u5099\u5B8C\u4E86", "\u25B6 \u30C8\u30EC\u30FC\u30B9\u5B9F\u884C", "_execTrace()");
+  function updateTraceGuide() {
+    if (!state_default.traceGuideActive) return;
+    const step = state_default.traceGuideStep;
+    if (step === "trails") {
+      if (trailGraph.nodes.size > 0) goToFireStep();
       return;
     }
-    state_default.traceGuideActive = true;
-    if (!hasTrails) {
-      if (!state_default.layers.trails) toggleMapLayer("trails");
-      showStepBanner("hiking", "\u767B\u5C71\u9053\u3092\u8AAD\u307F\u8FBC\u3093\u3067\u3044\u307E\u3059...");
-    } else if (!hasFire) {
-      activateTool("fire", "local_fire_department", "\u706B\u70B9\u8FFD\u52A0", "", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u706B\u70B9\u3092\u767B\u9332");
-      showStepBanner("local_fire_department", "\u706B\u70B9\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
-    } else {
-      activateTool("water", "water_drop", "\u6C34\u5229\u8FFD\u52A0", "water-mode", "\u5730\u56F3\u3092\u30BF\u30C3\u30D7\u3057\u3066\u6C34\u6E90\u3092\u767B\u9332");
-      showStepBanner("water_drop", "\u6C34\u5229\u3092\u5730\u56F3\u306B\u30BF\u30C3\u30D7\u3057\u3066\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
+    if (step === "fire") {
+      const last = state_default.firePoints[state_default.firePoints.length - 1];
+      if (last) {
+        state_default.traceFire = { lon: last.lon, lat: last.lat, height: last.height };
+        showToast("\u706B\u70B9\u3092\u9078\u629E\u3057\u307E\u3057\u305F");
+        goToWaterStep();
+      }
+      return;
     }
+    if (step === "water") {
+      const last = state_default.waterSources[state_default.waterSources.length - 1];
+      if (last) {
+        state_default.traceWater = { lon: last.lon, lat: last.lat };
+        showToast("\u6C34\u5229\u3092\u9078\u629E\u3057\u307E\u3057\u305F");
+        goToReadyStep();
+      }
+      return;
+    }
+  }
+  function traceSelectFire(fp) {
+    if (!state_default.traceGuideActive || state_default.traceGuideStep !== "fire") return false;
+    state_default.traceFire = { lon: fp.lon, lat: fp.lat, height: fp.height };
+    showToast("\u706B\u70B9\u3092\u9078\u629E\u3057\u307E\u3057\u305F");
+    goToWaterStep();
+    return true;
+  }
+  function traceSelectWater(ws) {
+    if (!state_default.traceGuideActive || state_default.traceGuideStep !== "water") return false;
+    state_default.traceWater = { lon: ws.lon, lat: ws.lat };
+    showToast("\u6C34\u5229\u3092\u9078\u629E\u3057\u307E\u3057\u305F");
+    goToReadyStep();
+    return true;
   }
   async function execTrace() {
     hideGuideBanner();
@@ -714,9 +756,14 @@ var HoseCalc = (() => {
   async function executeTrace() {
     hideGuideBanner();
     state_default.traceGuideActive = false;
+    state_default.traceGuideStep = null;
+    const fire = state_default.traceFire;
+    const water = state_default.traceWater;
+    if (!fire || !water) {
+      showToast("\u706B\u70B9\u3068\u6C34\u5229\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
+      return;
+    }
     showLoading(true, "\u6700\u9069\u30EB\u30FC\u30C8\u3092\u63A2\u7D22\u4E2D...", 20);
-    const water = state_default.waterSources[state_default.waterSources.length - 1];
-    const fire = state_default.firePoints[state_default.firePoints.length - 1];
     const nearWater = findNearestNode(water.lon, water.lat, 1e3);
     const nearFire = findNearestNode(fire.lon, fire.lat, 1e3);
     if (!nearWater) {
@@ -736,7 +783,7 @@ var HoseCalc = (() => {
       showToast("\u6C34\u5229\u2192\u706B\u70B9\u306E\u7D4C\u8DEF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\uFF08\u9053\u304C\u3064\u306A\u304C\u3063\u3066\u3044\u306A\u3044\u53EF\u80FD\u6027\uFF09");
       return;
     }
-    showLoading(true, `\u30EB\u30FC\u30C8\u767A\u898B\uFF08${result.path.length}\u70B9, ${(result.totalDist / 1e3).toFixed(1)}km\uFF09\u6A19\u9AD8\u53D6\u5F97\u4E2D...`, 60);
+    showLoading(true, `\u30EB\u30FC\u30C8\u767A\u898B\uFF08${result.path.length}\u70B9, ${(result.totalDist / 1e3).toFixed(1)}km\uFF09`, 60);
     const fullPath = [{ lon: water.lon, lat: water.lat }];
     fullPath.push(...result.path);
     fullPath.push({ lon: fire.lon, lat: fire.lat });
@@ -766,6 +813,8 @@ var HoseCalc = (() => {
     showLoading(false);
     const totalDist = result.totalDist + nearWater.dist + nearFire.dist;
     showToast(`\u767B\u5C71\u9053\u30C8\u30EC\u30FC\u30B9\u5B8C\u4E86\uFF08${(totalDist / 1e3).toFixed(1)}km, ${simplified.length}\u70B9\uFF09\u2192\u300C\u78BA\u5B9A\u300D\u3067\u30B7\u30DF\u30E5\u30EC\u30FC\u30B7\u30E7\u30F3`);
+    state_default.traceFire = null;
+    state_default.traceWater = null;
     state_default.viewer.scene.requestRender();
   }
   function simplifyPath(path, maxPoints) {
@@ -1267,6 +1316,10 @@ var HoseCalc = (() => {
   function selectFirePoint(id) {
     const f = state_default.firePoints.find((p) => p.id === id);
     if (!f) return;
+    if (state_default.traceGuideActive && state_default.traceGuideStep === "fire") {
+      Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.traceSelectFire(f));
+      return;
+    }
     closeAllPanels();
     state_default.selectedFirePoint = f;
     document.getElementById("fireLat").textContent = f.lat.toFixed(6) + "\xB0";
@@ -1334,6 +1387,10 @@ var HoseCalc = (() => {
   function selectWater(id) {
     const w = state_default.waterSources.find((s) => s.id === id);
     if (!w) return;
+    if (state_default.traceGuideActive && state_default.traceGuideStep === "water") {
+      Promise.resolve().then(() => (init_trace(), trace_exports)).then((m) => m.traceSelectWater(w));
+      return;
+    }
     closeAllPanels();
     state_default.selectedWater = w;
     document.getElementById("waterType").textContent = WATER_TYPE_NAMES[w.type] || w.type;

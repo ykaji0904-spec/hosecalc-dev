@@ -77,7 +77,7 @@ Object.assign(window, {
     setBasemap, setViewMode, toggleMapLayer, toggleHazardLayer, goToMyLocation,
     openSidePanel, closeSidePanel, closePanel, copyCoords, copyText, copyMarkerCoords,
     hideCoordPopup, hideMarkerPopup, showInfo, closeInfoModal, hideGuideBanner,
-    deleteSelectedFire, confirmWaterType,
+    deleteSelectedFire, deleteSelectedWater, confirmWaterType,
     undoHosePoint, resetHoseLine, closeHosePanel, confirmHoseLine, deleteSelectedHose, onParamChange,
     resetMeasure, closeMeasurePanel,
     doSearch, _flyToSearch: flyToSearch,

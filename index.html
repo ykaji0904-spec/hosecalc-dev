@@ -188,14 +188,15 @@
         .scale-bar{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:4px}
         .scale-line{height:3px;background:white;border-radius:1px;min-width:40px}
         .scale-text{color:white;font-size:9px;font-weight:500}
-        #guideBanner{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(20,25,35,0.95);border:1px solid rgba(76,175,80,0.4);border-radius:12px;padding:0;z-index:2500;display:none;min-width:200px;max-width:90vw;backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,0.4);overflow:hidden}
+        #guideBanner{position:fixed;top:110px;left:50%;transform:translateX(-50%);background:rgba(20,25,35,0.95);border:1px solid rgba(76,175,80,0.4);border-radius:12px;padding:0;z-index:2500;display:none;min-width:200px;max-width:90vw;backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,0.4);overflow:hidden}
         #guideBanner.show{display:block;animation:slideDown .3s ease}
         @keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
         .guide-banner-body{display:flex;align-items:center;gap:8px;padding:10px 14px}
         .guide-banner-body .material-icons{color:#4caf50}
         .guide-msg{color:#eee;font-size:13px;font-weight:500;flex:1;white-space:nowrap}
-        .guide-action-btn{background:#4caf50;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+        .guide-action-btn{background:#4caf50;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;animation:pulse 1.5s infinite}
         .guide-action-btn:active{transform:scale(0.95);background:#388e3c}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
         .guide-close{background:none;border:none;color:#888;font-size:16px;cursor:pointer;padding:0 2px;margin-left:4px}
         .guide-close:hover{color:#fff}
         .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:none;z-index:3000;justify-content:center;align-items:center;flex-direction:column}

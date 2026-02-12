@@ -12,9 +12,10 @@ function showStepBanner(icon, message, actionLabel, actionFn) {
         el.id = 'guideBanner';
         document.body.appendChild(el);
     }
+    const colorClass = icon === 'local_fire_department' ? 'ic-fire' : icon === 'water_drop' ? 'ic-water' : icon === 'route' ? 'ic-route' : '';
     el.innerHTML = `
         <div class="guide-banner-body">
-            <span class="material-icons" style="font-size:20px">${icon}</span>
+            <span class="material-icons ${colorClass}" style="font-size:20px">${icon}</span>
             <span class="guide-msg">${message}</span>
             ${actionLabel ? `<button class="guide-action-btn" onclick="${actionFn}">${actionLabel}</button>` : ''}
             <button class="guide-close" onclick="hideGuideBanner()">✕</button>

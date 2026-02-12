@@ -35,6 +35,13 @@ export function addWaterSource(type, name, lon, lat) {
 export function selectWater(id) {
     const w = S.waterSources.find(s => s.id === id);
     if (!w) return;
+
+    // トレースガイド中：既存水利の選択
+    if (S.traceGuideActive && S.traceGuideStep === 'water') {
+        import('./trace.js').then(m => m.traceSelectWater(w));
+        return;
+    }
+
     closeAllPanels();
     S.selectedWater = w;
     document.getElementById('waterType').textContent = WATER_TYPE_NAMES[w.type] || w.type;

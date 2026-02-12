@@ -199,6 +199,9 @@
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
         .guide-close{background:none;border:none;color:#888;font-size:16px;cursor:pointer;padding:0 2px;margin-left:4px}
         .guide-close:hover{color:#fff}
+        .reset-btn{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#ccc;font-size:13px;font-weight:500;cursor:pointer;width:100%}
+        .reset-btn .material-icons{font-size:18px;color:#ff9800}
+        .reset-btn:active{background:rgba(255,152,0,0.15);transform:scale(0.98)}
         .loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:none;z-index:3000;justify-content:center;align-items:center;flex-direction:column}
         .loading-overlay.show{display:flex}
         .loading-spinner{width:60px;height:60px;position:relative;margin-bottom:20px}
@@ -290,6 +293,12 @@
         <div class="panel-section"><div class="panel-section-title">地図レイヤ</div><div class="layer-grid"><div class="layer-card" id="layerBuildings" onclick="toggleMapLayer('buildings')"><div class="layer-card-icon building"><span class="material-icons">location_city</span></div><span class="layer-card-name">3D建物</span></div><div class="layer-card" id="layerTrails" onclick="toggleMapLayer('trails')"><div class="layer-card-icon trail"><span class="material-icons">hiking</span></div><span class="layer-card-name">登山道</span></div></div></div>
         <div class="panel-section"><div class="panel-section-title">オペレーション</div><div class="layer-grid"><div class="layer-card" id="opFire" onclick="setOperation('fire')"><div class="layer-card-icon fire"><span class="material-icons">local_fire_department</span></div><span class="layer-card-name">火点</span></div><div class="layer-card" id="opWater" onclick="setOperation('water')"><div class="layer-card-icon water"><span class="material-icons">water_drop</span></div><span class="layer-card-name">水利</span></div><div class="layer-card" id="opHose" onclick="setOperation('hose')"><div class="layer-card-icon hose"><span class="material-icons">route</span></div><span class="layer-card-name">ホース延長</span></div><div class="layer-card" id="opMeasure" onclick="setOperation('measure')"><div class="layer-card-icon measure"><span class="material-icons">straighten</span></div><span class="layer-card-name">2点計測</span></div><div class="layer-card" id="opTrace" onclick="traceTrailRoute()"><div class="layer-card-icon trail"><span class="material-icons">timeline</span></div><span class="layer-card-name">登山道トレース</span></div></div></div>
         <div class="panel-section"><div class="panel-section-title">情報レイヤ（ハザード）</div><div class="layer-grid"><div class="layer-card" id="layerFlood" onclick="toggleHazardLayer('flood')"><div class="layer-card-icon flood"><span class="material-icons">water</span></div><span class="layer-card-name">洪水</span></div><div class="layer-card" id="layerTsunami" onclick="toggleHazardLayer('tsunami')"><div class="layer-card-icon tsunami"><span class="material-icons">waves</span></div><span class="layer-card-name">津波</span></div><div class="layer-card" id="layerLandslide" onclick="toggleHazardLayer('landslide')"><div class="layer-card-icon landslide"><span class="material-icons">landslide</span></div><span class="layer-card-name">土砂</span></div></div></div>
+        <div class="panel-section"><div class="panel-section-title">リセット</div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding:0 4px">
+                <button class="reset-btn" onclick="clearSimResults()"><span class="material-icons">delete_sweep</span>シミュレーション結果をクリア</button>
+                <button class="reset-btn" onclick="clearAllPoints()"><span class="material-icons">location_off</span>火点・水利をすべて削除</button>
+            </div>
+        </div>
         <div class="panel-section"><div class="panel-section-title">機能説明</div>
             <div class="feature-list">
                 <div class="feature-item"><span class="material-icons fire">local_fire_department</span><div class="feature-item-content"><div class="feature-item-title">火点登録</div><div class="feature-item-desc">メニューから選択後、地図をタップして火災発生地点をマーク。タップで詳細表示。</div></div></div>

@@ -143,3 +143,35 @@ export function showInfo(type) {
 export function closeInfoModal() {
     document.getElementById('infoModalOverlay').classList.remove('show');
 }
+
+// ガイドバナー
+export function showGuideBanner(steps) {
+    // steps: [{label, done, active}]
+    let el = document.getElementById('guideBanner');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'guideBanner';
+        document.body.appendChild(el);
+    }
+    el.innerHTML = `
+        <div class="guide-banner-header">
+            <span class="material-icons">timeline</span>
+            登山道トレース
+            <button class="guide-close" onclick="hideGuideBanner()">✕</button>
+        </div>
+        <div class="guide-steps">
+            ${steps.map((s, i) => `
+                <div class="guide-step ${s.done ? 'done' : ''} ${s.active ? 'active' : ''}">
+                    <span class="guide-num">${s.done ? '✓' : i + 1}</span>
+                    <span class="guide-label">${s.label}</span>
+                </div>
+            `).join('<div class="guide-arrow">→</div>')}
+        </div>
+    `;
+    el.classList.add('show');
+}
+
+export function hideGuideBanner() {
+    const el = document.getElementById('guideBanner');
+    if (el) el.classList.remove('show');
+}

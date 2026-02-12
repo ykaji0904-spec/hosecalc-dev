@@ -27,6 +27,8 @@ export function addWaterSource(type, name, lon, lat) {
     });
     S.waterEntities.push(e);
     if (!S.isRestoring) saveAllData();
+    // トレースガイド更新
+    if (S.traceGuideActive) import('./trace.js').then(m => m.updateTraceGuide());
     return id;
 }
 

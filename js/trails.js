@@ -56,6 +56,7 @@ export async function loadTrails() {
 
             // グラフ構築
             let newNodes = 0, newEdges = 0;
+            const wayEndpoints = []; // 各wayの端点を記録
             ways.forEach(way => {
                 const wayNodes = way.nodes.filter(nid => nodes.has(nid));
                 for (let i = 0; i < wayNodes.length; i++) {
@@ -69,7 +70,6 @@ export async function loadTrails() {
                         const prev = wayNodes[i - 1];
                         const [lon1, lat1] = nodes.get(prev);
                         const [lon2, lat2] = nodes.get(nid);
-                        // 重複エッジ回避
                         const existing = trailGraph.edges.get(prev);
                         if (!existing || !existing.some(e => e.to === nid)) {
                             const dist = haversineDistance(lon1, lat1, lon2, lat2);
@@ -78,7 +78,34 @@ export async function loadTrails() {
                         }
                     }
                 }
+                // 端点を記録
+                if (wayNodes.length >= 2) {
+                    wayEndpoints.push(wayNodes[0], wayNodes[wayNodes.length - 1]);
+                }
             });
+
+            // === 途切れた登山道を自動接続（25m以内）===
+            const BRIDGE_MAX_M = 25;
+            let bridgeCount = 0;
+            const uniqueEndpoints = [...new Set(wayEndpoints)];
+            for (let i = 0; i < uniqueEndpoints.length; i++) {
+                const a = uniqueEndpoints[i];
+                const nodeA = trailGraph.nodes.get(a);
+                if (!nodeA) continue;
+                for (let j = i + 1; j < uniqueEndpoints.length; j++) {
+                    const b = uniqueEndpoints[j];
+                    const nodeB = trailGraph.nodes.get(b);
+                    if (!nodeB) continue;
+                    // 既に接続済みならスキップ
+                    const edgesA = trailGraph.edges.get(a);
+                    if (edgesA && edgesA.some(e => e.to === b)) continue;
+                    const dist = haversineDistance(nodeA.lon, nodeA.lat, nodeB.lon, nodeB.lat);
+                    if (dist <= BRIDGE_MAX_M) {
+                        addEdge(a, b, dist);
+                        bridgeCount++;
+                    }
+                }
+            }
 
             showLoading(true, `${ways.length}本の登山道を描画中...`, 85);
             ways.forEach(way => {
@@ -93,8 +120,8 @@ export async function loadTrails() {
 
             S.viewer.scene.requestRender();
             showLoading(true, '完了', 100);
-            console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges`);
-            if (ways.length > 0) showToast(`登山道 ${ways.length}本（${trailGraph.nodes.size}ノード）`);
+            console.log(`[Trail Graph] ${trailGraph.nodes.size} nodes, ${newEdges} edges, ${bridgeCount} bridges(≤25m)`);
+            if (ways.length > 0) showToast(`登山道 ${ways.length}本（${trailGraph.nodes.size}ノード${bridgeCount > 0 ? ', ' + bridgeCount + '箇所自動接続' : ''}）`);
             else showToast('この範囲に登山道データがありません');
             success = true;
             // トレースガイド更新

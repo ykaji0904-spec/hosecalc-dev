@@ -309,5 +309,18 @@
         </div>
     </div>
     <script type="module" src="js/app.js"></script>
+    <script>
+        // WebGL事前チェック（Cesium初期化前に実行）
+        (function() {
+            try {
+                var c = document.createElement('canvas');
+                var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+                if (!gl) {
+                    document.getElementById('loadingMessage').textContent = 'WebGLがサポートされていません。ブラウザの設定でハードウェアアクセラレーションを有効にしてください。';
+                    document.getElementById('loadingOverlay').classList.add('show');
+                }
+            } catch(e) {}
+        })();
+    </script>
 </body>
 </html>

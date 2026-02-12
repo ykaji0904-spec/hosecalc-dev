@@ -174,4 +174,5 @@ export function showGuideBanner(steps) {
 export function hideGuideBanner() {
     const el = document.getElementById('guideBanner');
     if (el) el.classList.remove('show');
+    S.traceGuideActive = false;
 }

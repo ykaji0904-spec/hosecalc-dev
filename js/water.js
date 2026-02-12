@@ -43,11 +43,19 @@ export function selectWater(id) {
 
 export function deleteSelectedWater() {
     if (!S.selectedWater) return;
-    const idx = S.waterSources.findIndex(s => s.id === S.selectedWater.id);
-    if (idx >= 0) {
-        S.waterSources.splice(idx, 1);
-        S.viewer.entities.remove(S.waterEntities[idx]);
-        S.waterEntities.splice(idx, 1);
+    const id = S.selectedWater.id;
+    // IDで検索（インデックス同期に依存しない）
+    const dataIdx = S.waterSources.findIndex(s => s.id === id);
+    if (dataIdx >= 0) S.waterSources.splice(dataIdx, 1);
+    // エンティティもIDで検索して削除
+    const entityIdx = S.waterEntities.findIndex(e => e.id === id);
+    if (entityIdx >= 0) {
+        S.viewer.entities.remove(S.waterEntities[entityIdx]);
+        S.waterEntities.splice(entityIdx, 1);
+    } else {
+        // フォールバック: viewer.entitiesから直接IDで削除
+        const entity = S.viewer.entities.getById(id);
+        if (entity) S.viewer.entities.remove(entity);
     }
     document.getElementById('waterPanel').classList.remove('active');
     S.selectedWater = null;

@@ -46,14 +46,7 @@ export function updateTraceGuide() {
     const hasFire = S.firePoints.length > 0;
 
     if (!hasTrails) {
-        // まだ読み込み中
         showStepBanner('hiking', '登山道を読み込んでいます...');
-        return;
-    }
-
-    if (!hasWater) {
-        activateTool('water', 'water_drop', '水利追加', 'water-mode', '地図をタップして水源を登録');
-        showStepBanner('water_drop', '水利を地図にタップして追加してください');
         return;
     }
 
@@ -63,10 +56,16 @@ export function updateTraceGuide() {
         return;
     }
 
+    if (!hasWater) {
+        activateTool('water', 'water_drop', '水利追加', 'water-mode', '地図をタップして水源を登録');
+        showStepBanner('water_drop', '水利を地図にタップして追加してください');
+        return;
+    }
+
     // 全条件揃った
     S.traceGuideActive = false;
     clearTool();
-    showStepBanner('route', '準備完了', 'トレース実行', '_execTrace()');
+    showStepBanner('route', '準備完了', '▶ トレース実行', '_execTrace()');
 }
 
 // トレースボタン押下
@@ -79,7 +78,7 @@ export async function traceTrailRoute() {
     const hasFire = S.firePoints.length > 0;
 
     if (hasTrails && hasWater && hasFire) {
-        showStepBanner('route', '準備完了', 'トレース実行', '_execTrace()');
+        showStepBanner('route', '準備完了', '▶ トレース実行', '_execTrace()');
         return;
     }
 
@@ -89,12 +88,12 @@ export async function traceTrailRoute() {
     if (!hasTrails) {
         if (!S.layers.trails) toggleMapLayer('trails');
         showStepBanner('hiking', '登山道を読み込んでいます...');
-    } else if (!hasWater) {
-        activateTool('water', 'water_drop', '水利追加', 'water-mode', '地図をタップして水源を登録');
-        showStepBanner('water_drop', '水利を地図にタップして追加してください');
-    } else {
+    } else if (!hasFire) {
         activateTool('fire', 'local_fire_department', '火点追加', '', '地図をタップして火点を登録');
         showStepBanner('local_fire_department', '火点を地図にタップして追加してください');
+    } else {
+        activateTool('water', 'water_drop', '水利追加', 'water-mode', '地図をタップして水源を登録');
+        showStepBanner('water_drop', '水利を地図にタップして追加してください');
     }
 }
 

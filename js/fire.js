@@ -38,11 +38,18 @@ export function selectFirePoint(id) {
 
 export function deleteSelectedFire() {
     if (!S.selectedFirePoint) return;
-    const idx = S.firePoints.findIndex(p => p.id === S.selectedFirePoint.id);
-    if (idx >= 0) {
-        S.firePoints.splice(idx, 1);
-        S.viewer.entities.remove(S.firePointEntities[idx]);
-        S.firePointEntities.splice(idx, 1);
+    const id = S.selectedFirePoint.id;
+    // IDで検索（インデックス同期に依存しない）
+    const dataIdx = S.firePoints.findIndex(p => p.id === id);
+    if (dataIdx >= 0) S.firePoints.splice(dataIdx, 1);
+    // エンティティもIDで検索して削除
+    const entityIdx = S.firePointEntities.findIndex(e => e.id === id);
+    if (entityIdx >= 0) {
+        S.viewer.entities.remove(S.firePointEntities[entityIdx]);
+        S.firePointEntities.splice(entityIdx, 1);
+    } else {
+        const entity = S.viewer.entities.getById(id);
+        if (entity) S.viewer.entities.remove(entity);
     }
     document.getElementById('firePanel').classList.remove('active');
     S.selectedFirePoint = null;
